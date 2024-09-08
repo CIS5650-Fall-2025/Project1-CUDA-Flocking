@@ -287,11 +287,15 @@ __device__ glm::vec3 computeVelocityChange(int N, int iSelf, const glm::vec3 *po
     }
   }
   glm::vec3 new_velocity = glm::vec3(0.0f, 0.0f, 0.0f);
-  perceived_center /= rule_1_count;
-  perceived_velocity /= rule_3_count;
-  new_velocity += (perceived_center - pos[iSelf]) * rule1Scale;
+  if (rule_1_count > 0){
+    perceived_center /= rule_1_count;
+    new_velocity += (perceived_center - pos[iSelf]) * rule1Scale;
+  }
+  if (rule_3_count > 0){
+    perceived_velocity /= rule_3_count;
+    new_velocity += perceived_velocity * rule3Scale;
+  }
   new_velocity += neightbour_distance * rule2Scale;
-  new_velocity += perceived_velocity * rule3Scale;
   return new_velocity;
 }
 
@@ -476,11 +480,16 @@ __global__ void kernUpdateVelNeighborSearchScattered(
     }
   }
   glm::vec3 velocityChange = glm::vec3(0.0f, 0.0f, 0.0f);
-  perceived_center /= rule_1_count;
-  perceived_velocity /= rule_3_count;
-  velocityChange += (perceived_center - pos[index]) * rule1Scale;
+  glm::vec3 new_velocity = glm::vec3(0.0f, 0.0f, 0.0f);
+  if (rule_1_count > 0){
+    perceived_center /= rule_1_count;
+    velocityChange += (perceived_center - pos[index]) * rule1Scale;
+  }
+  if (rule_3_count > 0){
+    perceived_velocity /= rule_3_count;
+    velocityChange += perceived_velocity * rule3Scale;
+  }
   velocityChange += neightbour_distance * rule2Scale;
-  velocityChange += perceived_velocity * rule3Scale;
 
   glm::vec3 newVelocity = vel1[index] + velocityChange;
   // Clamp the speed
@@ -555,11 +564,15 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
     }
   }
   glm::vec3 velocityChange = glm::vec3(0.0f, 0.0f, 0.0f);
-  perceived_center /= rule_1_count;
-  perceived_velocity /= rule_3_count;
-  velocityChange += (perceived_center - pos[index]) * rule1Scale;
+  if (rule_1_count > 0){
+    perceived_center /= rule_1_count;
+    velocityChange += (perceived_center - pos[index]) * rule1Scale;
+  }
+  if (rule_3_count > 0){
+    perceived_velocity /= rule_3_count;
+    velocityChange += perceived_velocity * rule3Scale;
+  }
   velocityChange += neightbour_distance * rule2Scale;
-  velocityChange += perceived_velocity * rule3Scale;
 
   glm::vec3 newVelocity = vel1[index] + velocityChange;
   // Clamp the speed
