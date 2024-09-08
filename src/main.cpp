@@ -16,7 +16,7 @@
 // ================
 
 // LOOK-2.1 LOOK-2.3 - toggles for UNIFORM_GRID and COHERENT_GRID
-#define VISUALIZE 1
+#define VISUALIZE 0
 #define UNIFORM_GRID 1
 #define COHERENT_GRID 1
 
@@ -219,11 +219,14 @@ void initShaders(GLuint * program) {
     double fps = 0;
     double timebase = 0;
     int frame = 0;
+    double startTime = glfwGetTime();
+    double totalFps = 0;
+    int fpsCount = 0;
 
     Boids::unitTest(); // LOOK-1.2 We run some basic example code to make sure
                        // your CUDA development setup is ready to go.
 
-    while (!glfwWindowShouldClose(window)) {
+    while (glfwGetTime() - startTime < 7.0) {
       glfwPollEvents();
 
       frame++;
@@ -233,6 +236,11 @@ void initShaders(GLuint * program) {
         fps = frame / (time - timebase);
         timebase = time;
         frame = 0;
+
+        if (time - startTime >= 2.0 && time - startTime <= 7.0) {
+          totalFps += fps;
+          fpsCount++;
+        }
       }
 
       runCUDA();
@@ -259,6 +267,10 @@ void initShaders(GLuint * program) {
       glfwSwapBuffers(window);
       #endif
     }
+
+    double avgFps = totalFps / fpsCount;
+    std::cout << "Average FPS: " << avgFps << std::endl;
+
     glfwDestroyWindow(window);
     glfwTerminate();
   }
