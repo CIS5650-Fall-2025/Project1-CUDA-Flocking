@@ -18,7 +18,7 @@
 // ================
 
 // LOOK-2.1 LOOK-2.3 - toggles for UNIFORM_GRID and COHERENT_GRID
-#define VISUALIZE 1
+#define VISUALIZE 0
 #define UNIFORM_GRID 1
 #define COHERENT_GRID 1
 
@@ -32,46 +32,36 @@ const float DT = 0.2f;
 int main(int argc, char *argv[])
 {
   projectName = "5650 CUDA Intro: Boids";
-  if (!init(argc, argv)) {
+  if (!init(argc, argv))
+  {
     return -1;
   }
 
-  // printBenchmarks();
-  mainLoop();
+  if (argc == 1) {
+    mainLoop();
+    
+  } else {
+    char* endptr;
+    unsigned int simIndex = strtol(argv[1], &endptr, 0);    
+    unsigned int numBoids = strtol(argv[2], &endptr, 0);
+    unsigned int blockSize = strtol(argv[3], &endptr, 0);
+
+    initVAO(numBoids);
+    Boids::initSimulation(numBoids, blockSize);
+
+    std::array<void (*)(float), 3> simulations = {
+        Boids::stepSimulationNaive,
+        Boids::stepSimulationScatteredGrid,
+        Boids::stepSimulationCoherentGrid,
+    };
+
+    double benchmarkMs = benchmarkMsPerFrame(numBoids, simulations[simIndex]);
+
+    std::cerr << benchmarkMs << std::endl;
+
+  }
   Boids::endSimulation();
   return 0;
-}
-
-void printBenchmarks() {
-  std::array<unsigned int, 4> boidCounts = {1000, 10000, 50000, 100000};
-  std::array<void(*)(float), 3> simulations = {Boids::stepSimulationNaive, Boids::stepSimulationScatteredGrid, Boids::stepSimulationCoherentGrid, };
-  std::array<std::string, 3> simNames = {"Naive", "Scattered", "Coherent"};
-
-  for (unsigned int blockSize = 16; blockSize <= 1024; blockSize *= 4) {
-    for (unsigned int numBoids : boidCounts) {
-      // auto err = cudaGetLastError();
-      // if (cudaGetLastError() != err) {
-      //   std::cerr << "Cuda error: " << err << std::endl;
-      //   exit(1);
-      // }
-      fillAndRegisterOpenGLBuffers(numBoids);
-      Boids::initSimulation(numBoids, blockSize);
-      std::cerr << blockSize << " " << numBoids << " ";
-      for (size_t i = 0; i < 3; i++) {
-        if (numBoids >= 50000 && i == 0) {
-          std::cerr << "N/A ";
-          continue;
-        }
-        double benchmarkMs = benchmarkMsPerFrame(numBoids, simulations[i]);
-        std::cerr << benchmarkMs << " ";
-      }
-      std::cerr << std::endl;
-      Boids::endSimulation();
-      cudaDeviceSynchronize();
-      unregisterOpenGLBuffers();
-    }
-  }
-  
 }
 
 //-------------------------------
@@ -82,9 +72,10 @@ std::string deviceName;
 GLFWwindow *window;
 
 /**
-* Initialization of CUDA and GLFW.
-*/
-bool init(int argc, char **argv) {
+ * Initialization of CUDA and GLFW.
+ */
+bool init(int argc, char **argv)
+{
   // Set window title to "Student Name: [SM 2.0] GPU Name"
   cudaDeviceProp deviceProp;
   int gpuDevice = 0;
@@ -143,8 +134,6 @@ bool init(int argc, char **argv) {
   // change the device ID.
   cudaGLSetGLDevice(0);
 
-  initVAO();
-
   updateCamera();
 
   initShaders(program);
@@ -154,7 +143,7 @@ bool init(int argc, char **argv) {
   return true;
 }
 
-void initVAO() {
+void initVAO(unsigned int numBoids) {
   glGenVertexArrays(1, &boidVAO); // Attach everything needed to draw a particle to this
   glGenBuffers(1, &boidVBO_positions);
   glGenBuffers(1, &boidVBO_velocities);
@@ -171,22 +160,26 @@ void initVAO() {
   glBindBuffer(GL_ARRAY_BUFFER, boidVBO_velocities);
   glEnableVertexAttribArray(velocitiesLocation);
   glVertexAttribPointer((GLuint)velocitiesLocation, 4, GL_FLOAT, GL_FALSE, 0, 0);
-}
 
-void fillAndRegisterOpenGLBuffers(unsigned int numBoids) {
   std::vector<glm::vec4> bodies(numBoids, glm::vec4(0, 0, 0, 1));
   glBindBuffer(GL_ARRAY_BUFFER, boidVBO_positions);
   glBufferData(GL_ARRAY_BUFFER, numBoids * sizeof(glm::vec4), bodies.data(), GL_DYNAMIC_DRAW);
   glBindBuffer(GL_ARRAY_BUFFER, boidVBO_velocities);
   glBufferData(GL_ARRAY_BUFFER, numBoids * sizeof(glm::vec4), bodies.data(), GL_DYNAMIC_DRAW);
-  cudaGLRegisterBufferObject(boidVBO_positions);
-  cudaGLRegisterBufferObject(boidVBO_velocities);  
-}
 
-void unregisterOpenGLBuffers()
-{
-  cudaGLUnregisterBufferObject(boidVBO_positions);
-  cudaGLUnregisterBufferObject(boidVBO_velocities);
+  // Bind the positions array to the boidVAO by way of the boidVBO_positions
+  glBindBuffer(GL_ARRAY_BUFFER, boidVBO_positions); // bind the buffer
+
+  glEnableVertexAttribArray(positionLocation);
+  glVertexAttribPointer((GLuint)positionLocation, 4, GL_FLOAT, GL_FALSE, 0, 0);
+
+  // Bind the velocities array to the boidVAO by way of the boidVBO_velocities
+  glBindBuffer(GL_ARRAY_BUFFER, boidVBO_velocities);
+  glEnableVertexAttribArray(velocitiesLocation);
+  glVertexAttribPointer((GLuint)velocitiesLocation, 4, GL_FLOAT, GL_FALSE, 0, 0);
+
+  cudaGLRegisterBufferObject(boidVBO_positions);
+  cudaGLRegisterBufferObject(boidVBO_velocities);
 }
 
 void initShaders(GLuint *program)
@@ -212,7 +205,7 @@ void initShaders(GLuint *program)
 //====================================
 // Main loop
 //====================================
-void runCUDA(void(*simulation)(float))
+void runCUDA(void (*simulation)(float))
 {
   // Map OpenGL buffer object for writing from CUDA on a single GPU
   // No data is moved (Win & Linux). When mapped to CUDA, OpenGL should not
@@ -250,10 +243,12 @@ double benchmarkMsPerFrame(unsigned int numBoids, void (*simulation)(float))
 
   double mean = 0;
 
-  while (true) {
+  while (true)
+  {
     glfwPollEvents();
 
-    if (glfwWindowShouldClose(window)) {
+    if (glfwWindowShouldClose(window))
+    {
       glfwDestroyWindow(window);
       glfwTerminate();
       return mean;
@@ -261,17 +256,32 @@ double benchmarkMsPerFrame(unsigned int numBoids, void (*simulation)(float))
 
     timebase = glfwGetTime();
     runCUDA(simulation);
+#if VISUALIZE
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glUseProgram(program[PROG_BOID]);
+    glBindVertexArray(boidVAO);
+    glPointSize((GLfloat)pointSize);
+    glDrawArrays(GL_POINTS, 0, numBoids);
+    glPointSize(1.0f);
+
+    glUseProgram(0);
+    glBindVertexArray(0);
+
+    glfwSwapBuffers(window);
+#endif
     double time = glfwGetTime();
     double frameTime = time - timebase;
     pastFrames.push_back(frameTime * 1000);
-    if (pastFrames.size() > dequeSize) {
+    if (pastFrames.size() > dequeSize)
+    {
       pastFrames.pop_front();
     }
-    
+
     mean = std::accumulate(pastFrames.begin(), pastFrames.end(), 0.0) / pastFrames.size();
 
     double runningTime = time - startTime;
-    if (runningTime > desiredRuntime) {
+    if (runningTime > desiredRuntime)
+    {
       break;
     }
 
@@ -285,19 +295,20 @@ double benchmarkMsPerFrame(unsigned int numBoids, void (*simulation)(float))
   return mean;
 }
 
-void mainLoop() {
-  void(*simulation)(float);
-  #if UNIFORM_GRID && COHERENT_GRID
-    simulation = Boids::stepSimulationCoherentGrid;
-  #elif UNIFORM_GRID
-    simulation = Boids::stepSimulationScatteredGrid;
-  #else
-    simulation = Boids::stepSimulationNaive;
-  #endif
+void mainLoop()
+{
+  void (*simulation)(float);
+#if UNIFORM_GRID && COHERENT_GRID
+  simulation = Boids::stepSimulationCoherentGrid;
+#elif UNIFORM_GRID
+  simulation = Boids::stepSimulationScatteredGrid;
+#else
+  simulation = Boids::stepSimulationNaive;
+#endif
 
   unsigned int numBoids = 50000;
   unsigned int blockSize = 128;
-  fillAndRegisterOpenGLBuffers(numBoids);
+  initVAO(numBoids);
   Boids::initSimulation(numBoids, blockSize);
 
   double fps = 0;
@@ -332,12 +343,12 @@ void mainLoop() {
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-      #if VISUALIZE
-      glUseProgram(program[PROG_BOID]);
-      glBindVertexArray(boidVAO);
-      glPointSize((GLfloat)pointSize);
-      glDrawArrays(GL_POINTS, 0, numBoids);
-      glPointSize(1.0f);
+#if VISUALIZE
+    glUseProgram(program[PROG_BOID]);
+    glBindVertexArray(boidVAO);
+    glPointSize((GLfloat)pointSize);
+    glDrawArrays(GL_POINTS, 0, numBoids);
+    glPointSize(1.0f);
 
     glUseProgram(0);
     glBindVertexArray(0);

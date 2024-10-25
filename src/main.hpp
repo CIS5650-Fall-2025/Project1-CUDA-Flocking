@@ -71,14 +71,11 @@ void runCUDA(void(*simulation)(float));
 //====================================
 // Benchmarking
 //====================================
-void printBenchmarks();
 double benchmarkMsPerFrame(unsigned int numBoids, void(*simulation)(float));
 
 //====================================
 // Setup/init Stuff
 //====================================
 bool init(int argc, char **argv);
-void initVAO();
-void fillAndRegisterOpenGLBuffers(unsigned int numBoids);
-void unregisterOpenGLBuffers();
+void initVAO(unsigned int numBoids);
 void initShaders(GLuint *program);

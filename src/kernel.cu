@@ -17,6 +17,8 @@
 
 #define checkCUDAErrorWithLine(msg) checkCUDAError(msg, __LINE__)
 
+#define USE_8_NEIGHBORS
+
 /**
  * Check for CUDA errors; print and exit if there was a problem.
  */
@@ -157,9 +159,11 @@ void Boids::initSimulation(int N, size_t B)
   checkCUDAErrorWithLine("cudaMalloc dev_pos failed!");
 
   cudaMalloc((void **)&dev_vel1, N * sizeof(glm::vec3));
+  cudaMemset(dev_vel1, 0, N * sizeof(glm::vec3));
   checkCUDAErrorWithLine("cudaMalloc dev_vel1 failed!");
 
   cudaMalloc((void **)&dev_vel2, N * sizeof(glm::vec3));
+  cudaMemset(dev_vel2, 0, N * sizeof(glm::vec3));
   checkCUDAErrorWithLine("cudaMalloc dev_vel2 failed!");
 
   // LOOK-1.2 - This is a typical CUDA kernel invocation.
@@ -455,9 +459,14 @@ __global__ void kernUpdateVelNeighborSearchScattered(
   glm::ivec3 selfGridCell = glm::floor(selfGridPos);
 
   // - Identify which cells may contain neighbors. This isn't always 8.
+  #ifdef USE_8_NEIGHBORS
   glm::ivec3 offset = glm::sign(selfGridPos - glm::vec3(selfGridCell) - 0.5f);
   glm::ivec3 low = glm::max(selfGridCell + glm::min(offset, glm::ivec3(0)), glm::ivec3(0));
   glm::ivec3 high = glm::min(selfGridCell + glm::max(offset, glm::ivec3(0)), glm::ivec3(gridResolution - 1));
+  #else
+  glm::ivec3 low = glm::max(selfGridCell - 1, glm::ivec3(0));
+  glm::ivec3 high = glm::min(selfGridCell + 1, glm::ivec3(gridResolution - 1));
+  #endif
 
   for (int z = low.z; z <= high.z; z++)
     for (int y = low.y; y <= high.y; y++)
@@ -549,9 +558,14 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
   glm::ivec3 selfGridCell = glm::floor(selfGridPos);
 
   // - Identify which cells may contain neighbors. This isn't always 8.
+  #ifdef USE_8_NEIGHBORS
   glm::ivec3 offset = glm::sign(selfGridPos - glm::vec3(selfGridCell) - 0.5f);
   glm::ivec3 low = glm::max(selfGridCell + glm::min(offset, glm::ivec3(0)), glm::ivec3(0));
   glm::ivec3 high = glm::min(selfGridCell + glm::max(offset, glm::ivec3(0)), glm::ivec3(gridResolution - 1));
+  #else
+  glm::ivec3 low = glm::max(selfGridCell - 1, glm::ivec3(0));
+  glm::ivec3 high = glm::min(selfGridCell + 1, glm::ivec3(gridResolution - 1));
+  #endif
 
   for (int z = low.z; z <= high.z; z++)
     for (int y = low.y; y <= high.y; y++)
