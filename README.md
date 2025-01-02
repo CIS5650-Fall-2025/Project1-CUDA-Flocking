@@ -1,4 +1,4 @@
-Flocking
+CUDA Flocking
 ================
 
 * Jichu Mao
