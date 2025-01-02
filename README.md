@@ -1,5 +1,5 @@
-**University of Pennsylvania, CIS 5650: GPU Programming and Architecture,
-Project 1 - Flocking**
+Flocking
+================
 
 * Jichu Mao
   * [LinkedIn](https://www.linkedin.com/in/jichu-mao-a3a980226/)
@@ -8,7 +8,7 @@ Project 1 - Flocking**
 
 ## Introduction
 
-This project is based on Craig Reynolds' model for flocking of boids. Boids is a term Reynolds used to refer to simulated flocking creatures such as fish schools or bird flocks.
+This project is based on Craig Reynolds' model for flocking of boids. Boids is a term Reynolds used to refer to simulated flocking creatures such as fish schools or bird flocks. The base code for this project is derived from a GPU course project at the University of Pennsylvania.
 
 ## Principles
 
