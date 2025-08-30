@@ -438,7 +438,7 @@ __global__ void kernIdentifyCellStartEnd(int N, int *particleGridIndices,
 }
 
 __global__ void kernUpdateVelNeighborSearchScattered(
-  int N, int gridResolution, glm::vec3 gridMin,
+  int N, int gridResolution, glm::vec3 gridMin, int gridCellCount,
   float inverseCellWidth, float cellWidth,
   int *gridCellStartIndices, int *gridCellEndIndices,
   int *particleArrayIndices, float neighborhoodDistance,
@@ -605,7 +605,7 @@ void Boids::stepSimulationScatteredGrid(float dt) {
 
   // - Perform velocity updates using neighbor search
 
-    kernUpdateVelNeighborSearchScattered<<<blockSize, threadsPerBlock>>>(numObjects, gridSideCount, gridMinimum, gridInverseCellWidth, gridCellWidth,
+    kernUpdateVelNeighborSearchScattered<<<blockSize, threadsPerBlock>>>(numObjects, gridSideCount, gridMinimum, gridCellCount, gridInverseCellWidth, gridCellWidth,
         dev_gridCellStartIndices, dev_gridCellEndIndices, dev_particleArrayIndices, neighborhoodDistance, dev_pos, vel1, vel2);
 
   // - Update positions
