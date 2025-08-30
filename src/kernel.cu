@@ -233,6 +233,85 @@ void Boids::copyBoidsToVBO(float *vbodptr_positions, float *vbodptr_velocities) 
 * stepSimulation *
 ******************/
 
+__device__ glm::vec3 rule1Naive(int N, int iSelf, const glm::vec3* pos, const glm::vec3* vel) {
+    
+    glm::vec3 myPos = pos[iSelf];
+    glm::vec3 perceived_center(myPos);
+    int number_of_neighbors = 0;
+
+    for (int i = 0; i < N; ++i)
+    {
+        if (i == iSelf) continue;
+
+        glm::vec3 otherPos = pos[i];
+        glm::vec3 toOther = otherPos - myPos;
+        float toOtherLength = glm::length(toOther);
+
+        if (toOtherLength < rule1Distance)
+        {
+            perceived_center += otherPos;
+            ++number_of_neighbors;
+        }
+    }
+
+    if (number_of_neighbors)
+    {
+        perceived_center /= (float)number_of_neighbors;
+    }
+
+    return (perceived_center - myPos) * rule1Scale;
+}
+
+__device__ glm::vec3 rule2Naive(int N, int iSelf, const glm::vec3* pos, const glm::vec3* vel) {
+
+    glm::vec3 myPos = pos[iSelf];
+    glm::vec3 c(0.0f);
+
+    for (int i = 0; i < N; ++i)
+    {
+        if (i == iSelf) continue;
+        glm::vec3 otherPos = pos[i];
+        glm::vec3 toOther = otherPos - myPos;
+        
+        if (glm::length(toOther) < rule2Distance)
+        {
+            c -= (otherPos - myPos);
+        }
+    }
+
+    return c * rule2Scale;
+}
+
+__device__ glm::vec3 rule3Naive(int N, int iSelf, const glm::vec3* pos, const glm::vec3* vel) {
+    
+    glm::vec3 myPos = pos[iSelf];
+    glm::vec3 myVel = vel[iSelf];
+
+    glm::vec3 perceived_velocity(myVel);
+    int number_of_neighbors = 0;
+
+    for (int i = 0; i < N; ++i)
+    {
+        if (i == iSelf) continue;
+        
+        glm::vec3 otherPos = pos[i];
+        glm::vec3 otherVel = vel[i];
+        glm::vec3 toOther = otherPos - myPos;
+
+        if (glm::length(toOther) < rule3Distance)
+        {
+            perceived_velocity += otherVel;
+        }
+    }
+
+    if (number_of_neighbors)
+    {
+        perceived_velocity /= (float)number_of_neighbors;
+    }
+
+    return perceived_velocity * rule3Scale;
+}
+
 /**
 * LOOK-1.2 You can use this as a helper for kernUpdateVelocityBruteForce.
 * __device__ code can be called from a __global__ context
@@ -240,10 +319,19 @@ void Boids::copyBoidsToVBO(float *vbodptr_positions, float *vbodptr_velocities) 
 * in the `pos` and `vel` arrays.
 */
 __device__ glm::vec3 computeVelocityChange(int N, int iSelf, const glm::vec3 *pos, const glm::vec3 *vel) {
-  // Rule 1: boids fly towards their local perceived center of mass, which excludes themselves
-  // Rule 2: boids try to stay a distance d away from each other
-  // Rule 3: boids try to match the speed of surrounding boids
-  return glm::vec3(1.0f, 0.0f, 0.0f);
+    
+    glm::vec3 finalVelocity(0.0f);
+  
+    // Rule 1: boids fly towards their local perceived center of mass, which excludes themselves
+    finalVelocity += rule1Naive(N, iSelf, pos, vel);
+
+    // Rule 2: boids try to stay a distance d away from each other
+    finalVelocity += rule2Naive(N, iSelf, pos, vel);
+  
+    // Rule 3: boids try to match the speed of surrounding boids
+    //finalVelocity += rule3Naive(N, iSelf, pos, vel);
+  
+    return finalVelocity;
 }
 
 /**
