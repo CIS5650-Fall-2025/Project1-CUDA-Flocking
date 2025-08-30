@@ -583,11 +583,13 @@ void Boids::stepSimulationScatteredGrid(float dt) {
   // - label each particle with its array index as well as its grid index.
   //   Use 2x width grids.
 
+    dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
+
     static bool ping = false;
     const auto vel1 = ping ? dev_vel1 : dev_vel2;
     const auto vel2 = ping ? dev_vel2 : dev_vel1;
     assert(vel1 != vel2);
-    kernComputeIndices<<<blockSize, threadsPerBlock>>>(numObjects, gridSideCount, gridMinimum, gridInverseCellWidth, dev_pos, dev_particleArrayIndices, dev_particleGridIndices);
+    kernComputeIndices<<<fullBlocksPerGrid, threadsPerBlock>>>(numObjects, gridSideCount, gridMinimum, gridInverseCellWidth, dev_pos, dev_particleArrayIndices, dev_particleGridIndices);
 
   // - Unstable key sort using Thrust. A stable sort isn't necessary, but you
   //   are welcome to do a performance comparison.
@@ -601,16 +603,16 @@ void Boids::stepSimulationScatteredGrid(float dt) {
 
     cudaMemset(dev_gridCellStartIndices, -1, gridCellCount * sizeof(int));
     cudaMemset(dev_gridCellEndIndices, -1, gridCellCount * sizeof(int));
-    kernIdentifyCellStartEnd<<<blockSize, threadsPerBlock>>>(numObjects, dev_particleGridIndices, dev_gridCellStartIndices, dev_gridCellEndIndices);
+    kernIdentifyCellStartEnd<<<fullBlocksPerGrid, threadsPerBlock>>>(numObjects, dev_particleGridIndices, dev_gridCellStartIndices, dev_gridCellEndIndices);
 
   // - Perform velocity updates using neighbor search
 
-    kernUpdateVelNeighborSearchScattered<<<blockSize, threadsPerBlock>>>(numObjects, gridSideCount, gridMinimum, gridCellCount, gridInverseCellWidth, gridCellWidth,
+    kernUpdateVelNeighborSearchScattered<<<fullBlocksPerGrid, threadsPerBlock>>>(numObjects, gridSideCount, gridMinimum, gridCellCount, gridInverseCellWidth, gridCellWidth,
         dev_gridCellStartIndices, dev_gridCellEndIndices, dev_particleArrayIndices, neighborhoodDistance, dev_pos, vel1, vel2);
 
   // - Update positions
 
-    kernUpdatePos<<<blockSize, threadsPerBlock>>>(numObjects, dt, dev_pos, vel2);
+    kernUpdatePos<<<fullBlocksPerGrid, threadsPerBlock>>>(numObjects, dt, dev_pos, vel2);
 
   // - Ping-pong buffers as needed
 
@@ -641,10 +643,10 @@ void Boids::endSimulation() {
   cudaFree(dev_pos);
 
   // TODO-2.1 TODO-2.3 - Free any additional buffers here.
-  cudaFree(&dev_particleArrayIndices);
-  cudaFree(&dev_particleGridIndices);
-  cudaFree(&dev_gridCellStartIndices);
-  cudaFree(&dev_gridCellEndIndices);
+  cudaFree(dev_particleArrayIndices);
+  cudaFree(dev_particleGridIndices);
+  cudaFree(dev_gridCellStartIndices);
+  cudaFree(dev_gridCellEndIndices);
 }
 
 void Boids::unitTest() {
