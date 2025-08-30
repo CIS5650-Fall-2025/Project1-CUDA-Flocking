@@ -233,85 +233,6 @@ void Boids::copyBoidsToVBO(float *vbodptr_positions, float *vbodptr_velocities) 
 * stepSimulation *
 ******************/
 
-__device__ glm::vec3 rule1Naive(int N, int iSelf, const glm::vec3* pos, const glm::vec3* vel) {
-    
-    glm::vec3 myPos = pos[iSelf];
-    glm::vec3 perceived_center(myPos);
-    int number_of_neighbors = 0;
-
-    for (int i = 0; i < N; ++i)
-    {
-        if (i == iSelf) continue;
-
-        glm::vec3 otherPos = pos[i];
-        glm::vec3 toOther = otherPos - myPos;
-        float toOtherLength = glm::length(toOther);
-
-        if (toOtherLength < rule1Distance)
-        {
-            perceived_center += otherPos;
-            ++number_of_neighbors;
-        }
-    }
-
-    if (number_of_neighbors)
-    {
-        perceived_center /= (float)number_of_neighbors;
-    }
-
-    return (perceived_center - myPos) * rule1Scale;
-}
-
-__device__ glm::vec3 rule2Naive(int N, int iSelf, const glm::vec3* pos, const glm::vec3* vel) {
-
-    glm::vec3 myPos = pos[iSelf];
-    glm::vec3 c(0.0f);
-
-    for (int i = 0; i < N; ++i)
-    {
-        if (i == iSelf) continue;
-        glm::vec3 otherPos = pos[i];
-        glm::vec3 toOther = otherPos - myPos;
-        
-        if (glm::length(toOther) < rule2Distance)
-        {
-            c -= (otherPos - myPos);
-        }
-    }
-
-    return c * rule2Scale;
-}
-
-__device__ glm::vec3 rule3Naive(int N, int iSelf, const glm::vec3* pos, const glm::vec3* vel) {
-    
-    glm::vec3 myPos = pos[iSelf];
-    glm::vec3 myVel = vel[iSelf];
-
-    glm::vec3 perceived_velocity(myVel);
-    int number_of_neighbors = 0;
-
-    for (int i = 0; i < N; ++i)
-    {
-        if (i == iSelf) continue;
-        
-        glm::vec3 otherPos = pos[i];
-        glm::vec3 otherVel = vel[i];
-        glm::vec3 toOther = otherPos - myPos;
-
-        if (glm::length(toOther) < rule3Distance)
-        {
-            perceived_velocity += otherVel;
-        }
-    }
-
-    if (number_of_neighbors)
-    {
-        perceived_velocity /= (float)number_of_neighbors;
-    }
-
-    return perceived_velocity * rule3Scale;
-}
-
 /**
 * LOOK-1.2 You can use this as a helper for kernUpdateVelocityBruteForce.
 * __device__ code can be called from a __global__ context
@@ -319,19 +240,63 @@ __device__ glm::vec3 rule3Naive(int N, int iSelf, const glm::vec3* pos, const gl
 * in the `pos` and `vel` arrays.
 */
 __device__ glm::vec3 computeVelocityChange(int N, int iSelf, const glm::vec3 *pos, const glm::vec3 *vel) {
-    
-    glm::vec3 finalVelocity(0.0f);
-  
-    // Rule 1: boids fly towards their local perceived center of mass, which excludes themselves
-    finalVelocity += rule1Naive(N, iSelf, pos, vel);
 
-    // Rule 2: boids try to stay a distance d away from each other
-    finalVelocity += rule2Naive(N, iSelf, pos, vel);
+    glm::vec3 myPos = pos[iSelf];
+    glm::vec3 myVel = vel[iSelf];
+    glm::vec3 finalVel(myVel);
+
+    int cohesion_neighbors = 0;
+    int alignment_neighbors = 0;
+
+    glm::vec3 cohesion(0.0f); // rule1
+    glm::vec3 separation(0.0f); // rule2
+    glm::vec3 alignment(0.0f); // rule3
+
+    glm::vec3 cohesion_center(0.0f);
+
+    for (int i = 0; i < N; ++i) // For all other boids
+    {
+        if (i == iSelf) continue;
+
+        glm::vec3 otherPos = pos[i];
+        glm::vec3 otherVel = vel[i];
+
+        float distance = glm::distance(otherPos, myPos);
+
+        if (distance < rule1Distance)
+        {
+            cohesion_center += otherPos;
+            cohesion_neighbors++;
+        }
+
+        if (distance < rule2Distance)
+        {
+            separation -= (otherPos - myPos);
+        }
+
+        if (distance < rule3Distance)
+        {
+            alignment += otherVel;
+            alignment_neighbors++;
+        }
+    }
+
+    if (cohesion_neighbors > 0)
+    {
+        cohesion_center /= cohesion_neighbors;
+        cohesion = (cohesion_center - myPos) * rule1Scale;
+        finalVel += cohesion;
+    }
+
+    finalVel += separation * rule2Scale;
+
+    if (alignment_neighbors > 0)
+    {
+        alignment /= alignment_neighbors;
+        finalVel += alignment * rule3Scale;
+    }
   
-    // Rule 3: boids try to match the speed of surrounding boids
-    //finalVelocity += rule3Naive(N, iSelf, pos, vel);
-  
-    return finalVelocity;
+    return finalVel;
 }
 
 /**
@@ -345,11 +310,15 @@ __global__ void kernUpdateVelocityBruteForce(int N, glm::vec3 *pos,
   // Record the new velocity into vel2. Question: why NOT vel1?
 
     int index = threadIdx.x + (blockIdx.x * blockDim.x);
-    if (index >= N) {
+    if (0 > index || index >= N) {
         return;
     }
 
-    vel2[index] = computeVelocityChange(N, index, pos, vel1);
+    glm::vec3 new_vel = computeVelocityChange(N, index, pos, vel1);
+    float speed = glm::length(new_vel);
+    speed = glm::min(maxSpeed, speed);
+    new_vel = glm::normalize(new_vel) * speed;
+    vel2[index] = new_vel;
 }
 
 /**
@@ -363,13 +332,14 @@ __global__ void kernUpdatePos(int N, float dt, glm::vec3 *pos, glm::vec3 *vel) {
     return;
   }
   glm::vec3 thisPos = pos[index];
+
   thisPos += vel[index] * dt;
 
   // Wrap the boids around so we don't lose them
   thisPos.x = thisPos.x < -scene_scale ? scene_scale : thisPos.x;
   thisPos.y = thisPos.y < -scene_scale ? scene_scale : thisPos.y;
   thisPos.z = thisPos.z < -scene_scale ? scene_scale : thisPos.z;
-
+  
   thisPos.x = thisPos.x > scene_scale ? -scene_scale : thisPos.x;
   thisPos.y = thisPos.y > scene_scale ? -scene_scale : thisPos.y;
   thisPos.z = thisPos.z > scene_scale ? -scene_scale : thisPos.z;
@@ -460,6 +430,8 @@ void Boids::stepSimulationNaive(float dt) {
 
     // invoke kernUpdateVelocityBruteForce
     kernUpdateVelocityBruteForce<<<fullBlocksPerGrid, blockSize>>> (N, dev_pos, dev_vel1, dev_vel2);
+
+    //cudaDeviceSynchronize();
 
     // invoke kernUpdatePos with vel2 (newly written velocity)
     kernUpdatePos<<<fullBlocksPerGrid, blockSize>>>(N, dt, dev_pos, dev_vel2);
