@@ -569,7 +569,8 @@ void Boids::stepSimulationNaive(float dt) {
     const auto vel2 = ping ? dev_vel2 : dev_vel1;
     assert(vel1 != vel2);
 
-    kernUpdateVelocityBruteForce<<<blockSize, threadsPerBlock>>> (numObjects, dev_pos, vel1, vel2);
+    dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
+    kernUpdateVelocityBruteForce<<<fullBlocksPerGrid, threadsPerBlock>>> (numObjects, dev_pos, vel1, vel2);
     kernUpdatePos<<<blockSize, threadsPerBlock>>>(numObjects, dt, dev_pos, vel2);
 
   // 1.2 ping-pong the velocity buffers
