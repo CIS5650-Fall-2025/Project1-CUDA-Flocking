@@ -24,7 +24,8 @@
 // LOOK-2.1 LOOK-2.3 - toggles for UNIFORM_GRID and COHERENT_GRID
 #define VISUALIZE 1
 #define UNIFORM_GRID 1
-#define COHERENT_GRID 0
+#define COHERENT_GRID 1
+#define FULLSCREEN 0
 
 // LOOK-1.2 - change this to adjust particle count in the simulation
 const int N_FOR_VIS = 50000;
@@ -91,8 +92,18 @@ bool init(int argc, char **argv) {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
+  
+#if FULLSCREEN
+  // Change base code to be fullscreen because otherwise I can't measure framerates properly
+  GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
+  const GLFWvidmode* mode = glfwGetVideoMode(primaryMonitor);
+  int fullscreenWidth = mode->width;
+  int fullscreenHeight = mode->height;
+  window = glfwCreateWindow(fullscreenWidth, fullscreenHeight, deviceName.c_str(), primaryMonitor, NULL);
+#else
   window = glfwCreateWindow(width, height, deviceName.c_str(), NULL, NULL);
+#endif
+
   if (!window) {
     glfwTerminate();
     return false;
@@ -119,6 +130,11 @@ bool init(int argc, char **argv) {
 
   // Initialize N-body simulation
   Boids::initSimulation(N_FOR_VIS);
+
+#if FULLSCREEN
+  width = fullscreenWidth;
+  height = fullscreenHeight;
+#endif
 
   updateCamera();
 
