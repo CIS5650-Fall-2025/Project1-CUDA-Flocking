@@ -385,7 +385,7 @@ __global__ void kernComputeIndices(int N, int gridResolution,
     }
 
     glm::vec3 myPos = pos[index];
-    glm::ivec3 gridIndex3d = glm::ivec3((myPos - gridMin) / (float)gridResolution);
+    glm::ivec3 gridIndex3d = glm::ivec3((myPos - gridMin) * inverseCellWidth);
     int gridIndex1d = gridIndex3Dto1D(gridIndex3d.x, gridIndex3d.y, gridIndex3d.z, gridResolution);
 
     if (0 > gridIndex1d || gridIndex1d >= (gridResolution*gridResolution*gridResolution)) // TODO: temp
@@ -435,7 +435,7 @@ __global__ void kernUpdateVelNeighborSearchScattered(
   int *gridCellStartIndices, int *gridCellEndIndices,
   int *particleArrayIndices,
   glm::vec3 *pos, glm::vec3 *vel1, glm::vec3 *vel2) {
-  // TODO-2.1 - Update a boid's velocity using the uniform grid to reduce
+  // 2.1 - Update a boid's velocity using the uniform grid to reduce
   // the number of boids that need to be checked.
   // - Identify the grid cell that this particle is in
   // - Identify which cells may contain neighbors. This isn't always 8.
@@ -463,26 +463,30 @@ __global__ void kernUpdateVelNeighborSearchScattered(
 
     glm::vec3 cohesion_center(0.0f);
 
-    glm::ivec3 gridIndex3d = glm::ivec3((myPos - gridMin) / (float)gridResolution);
+    glm::ivec3 gridIndex3d = glm::ivec3((myPos - gridMin) * inverseCellWidth);
     
     // Iterate over all neighboring cells
+    const int CELL_MAX_IDX = gridResolution - 1;
     int z, y, x;
     for (int zIt = gridIndex3d.z - 1; zIt < gridIndex3d.z + 1; ++zIt)
     {
         z = zIt;
-        if (z < 0 || z >= gridResolution) continue; // TODO wrapping
+        if (z < 0) z = CELL_MAX_IDX;
+        else if (z >= gridResolution) z = 0;
 
         for (int yIt = gridIndex3d.y - 1; yIt < gridIndex3d.y + 1; ++yIt)
         {
             y = yIt;
-            if (y < 0 || y >= gridResolution) continue; // TODO wrapping
+            if (y < 0) y = CELL_MAX_IDX;
+            else if (y >= gridResolution) y = 0;
 
             for (int xIt = gridIndex3d.x - 1; xIt < gridIndex3d.x + 1; ++xIt)
             {
                 x = xIt;
-                if (x < 0 || x >= gridResolution) continue; // TODO wrapping 
+                if (x < 0) x = CELL_MAX_IDX;
+                else if (x >= gridResolution) x = 0;
 
-                int gridIndex1d = gridIndex3Dto1D(gridIndex3d.x, gridIndex3d.y, gridIndex3d.z, gridResolution);
+                int gridIndex1d = gridIndex3Dto1D(x, y, z, gridResolution);
                 
                 int cellStart = gridCellStartIndices[gridIndex1d];
                 int cellEnd = gridCellEndIndices[gridIndex1d];
@@ -518,6 +522,9 @@ __global__ void kernUpdateVelNeighborSearchScattered(
             }
         }
     }
+
+    // Compute flocking velocity from collected neighbor information
+
     if (cohesion_neighbors > 0)
     {
         cohesion_center /= cohesion_neighbors;
@@ -533,7 +540,7 @@ __global__ void kernUpdateVelNeighborSearchScattered(
         finalVel += alignment * rule3Scale;
     }
 
-    // TODO(ruben): It kind of works, but it kind of seems like each boid is picking up way way too many neighbors (or too few?)
+    // Clamp speed
     float speed = glm::length(finalVel);
     speed = glm::min(maxSpeed, speed);
     finalVel = glm::normalize(finalVel) * speed;
@@ -580,7 +587,7 @@ void Boids::stepSimulationNaive(float dt) {
 }
 
 void Boids::stepSimulationScatteredGrid(float dt) {
-    // TODO-2.1
+    // 2.1
     // Uniform Grid Neighbor search using Thrust sort.
     // In Parallel:
     // - label each particle with its array index as well as its grid index.
@@ -596,6 +603,9 @@ void Boids::stepSimulationScatteredGrid(float dt) {
     int N = numObjects;
     dim3 fullBlocksPerGrid((N + blockSize - 1) / blockSize);
 
+    //kernResetIntBuffer<<<fullBlocksPerGrid, blockSize>>>(gridCellCount, dev_gridCellStartIndices, -1);
+    //kernResetIntBuffer<<<fullBlocksPerGrid, blockSize>>>(gridCellCount, dev_gridCellEndIndices, -1);
+
     kernComputeIndices<<<fullBlocksPerGrid, blockSize>>>(N, gridSideCount, gridMinimum, gridInverseCellWidth, 
         dev_pos, dev_particleArrayIndices, dev_particleGridIndices);
 
@@ -603,17 +613,7 @@ void Boids::stepSimulationScatteredGrid(float dt) {
     dev_thrust_particleGridIndices = thrust::device_ptr<int>(dev_particleGridIndices);
     thrust::sort_by_key(dev_thrust_particleGridIndices, dev_thrust_particleGridIndices + N, dev_thrust_particleArrayIndices);
 
-    //__global__ void kernIdentifyCellStartEnd(int N, int* particleGridIndices,
-    //    int* gridCellStartIndices, int* gridCellEndIndices) {
-
     kernIdentifyCellStartEnd<<<fullBlocksPerGrid, blockSize>>>(N, dev_particleGridIndices, dev_gridCellStartIndices, dev_gridCellEndIndices);
-
-    //__global__ void kernUpdateVelNeighborSearchScattered(
-    //int N, int gridResolution, glm::vec3 gridMin,
-    //    float inverseCellWidth, float cellWidth,
-    //    int* gridCellStartIndices, int* gridCellEndIndices,
-    //    int* particleArrayIndices,
-    //    glm::vec3* pos, glm::vec3* vel1, glm::vec3* vel2) {
 
     kernUpdateVelNeighborSearchScattered<<<fullBlocksPerGrid, blockSize>>>(N, gridSideCount, gridMinimum, 
         gridInverseCellWidth, gridCellWidth,
