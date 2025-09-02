@@ -240,10 +240,47 @@ void Boids::copyBoidsToVBO(float *vbodptr_positions, float *vbodptr_velocities) 
 * in the `pos` and `vel` arrays.
 */
 __device__ glm::vec3 computeVelocityChange(int N, int iSelf, const glm::vec3 *pos, const glm::vec3 *vel) {
-  // Rule 1: boids fly towards their local perceived center of mass, which excludes themselves
-  // Rule 2: boids try to stay a distance d away from each other
-  // Rule 3: boids try to match the speed of surrounding boids
-  return glm::vec3(0.0f, 0.0f, 0.0f);
+    // Rule 1: boids fly towards their local perceived center of mass, which excludes themselves
+    // Rule 2: boids try to stay a distance d away from each other
+    // Rule 3: boids try to match the speed of surrounding boids
+
+    glm::vec3 center(0.f), separate(0.f), cohesion(0.f);
+    int neighborCount1 = 0, neighborCount3 = 0;
+    glm::vec3 deltaVelocity(0.f);
+
+    for (int j = 0; j < N; j++) 
+    {
+        if (iSelf == j) continue;
+        float distance = glm::length(pos[j] - pos[iSelf]);
+
+        // Rule 1: Cohesion: boids fly towards the center of mass of neighboring boids
+        if (distance < rule1Distance) {
+            center += pos[j];
+            ++neighborCount1;
+        }
+
+        // Rule 2: Separation: boids try to keep a small distance away from each other
+        if (distance < rule2Distance) {
+            separate -= (pos[j] - pos[iSelf]);
+        }
+
+        // Rule 3: Alignment: boids try to match the velocities of neighboring boids
+        if (distance < rule3Distance) {
+            cohesion += vel[j];
+            ++neighborCount3;
+        }
+    }
+
+    if (neighborCount1 > 0 && neighborCount3 > 0) {
+        center /= neighborCount1;
+        cohesion /= neighborCount3;
+
+        deltaVelocity += (center - pos[iSelf]) * rule1Scale;
+        deltaVelocity += separate * rule2Scale;
+        deltaVelocity += cohesion * rule3Scale;
+    }
+
+    return deltaVelocity;
 }
 
 /**
@@ -255,6 +292,15 @@ __global__ void kernUpdateVelocityBruteForce(int N, glm::vec3 *pos,
   // Compute a new velocity based on pos and vel1
   // Clamp the speed
   // Record the new velocity into vel2. Question: why NOT vel1?
+    int index = threadIdx.x + (blockIdx.x * blockDim.x);
+    if (index >= N) {
+        return;
+    }
+    glm::vec3 newVel = vel1[index] + computeVelocityChange(N, index, pos, vel1);
+    if (glm::length(newVel) > maxSpeed) {
+        newVel = glm::normalize(newVel) * maxSpeed;
+    }
+    vel2[index] = newVel;
 }
 
 /**
@@ -262,24 +308,24 @@ __global__ void kernUpdateVelocityBruteForce(int N, glm::vec3 *pos,
 * For each of the `N` bodies, update its position based on its current velocity.
 */
 __global__ void kernUpdatePos(int N, float dt, glm::vec3 *pos, glm::vec3 *vel) {
-  // Update position by velocity
-  int index = threadIdx.x + (blockIdx.x * blockDim.x);
-  if (index >= N) {
-    return;
-  }
-  glm::vec3 thisPos = pos[index];
-  thisPos += vel[index] * dt;
+    // Update position by velocity
+    int index = threadIdx.x + (blockIdx.x * blockDim.x);
+    if (index >= N) {
+      return;
+    }
+    glm::vec3 thisPos = pos[index];
+    thisPos += vel[index] * dt;
 
-  // Wrap the boids around so we don't lose them
-  thisPos.x = thisPos.x < -scene_scale ? scene_scale : thisPos.x;
-  thisPos.y = thisPos.y < -scene_scale ? scene_scale : thisPos.y;
-  thisPos.z = thisPos.z < -scene_scale ? scene_scale : thisPos.z;
+    // Wrap the boids around so we don't lose them
+    thisPos.x = thisPos.x < -scene_scale ? scene_scale : thisPos.x;
+    thisPos.y = thisPos.y < -scene_scale ? scene_scale : thisPos.y;
+    thisPos.z = thisPos.z < -scene_scale ? scene_scale : thisPos.z;
 
-  thisPos.x = thisPos.x > scene_scale ? -scene_scale : thisPos.x;
-  thisPos.y = thisPos.y > scene_scale ? -scene_scale : thisPos.y;
-  thisPos.z = thisPos.z > scene_scale ? -scene_scale : thisPos.z;
+    thisPos.x = thisPos.x > scene_scale ? -scene_scale : thisPos.x;
+    thisPos.y = thisPos.y > scene_scale ? -scene_scale : thisPos.y;
+    thisPos.z = thisPos.z > scene_scale ? -scene_scale : thisPos.z;
 
-  pos[index] = thisPos;
+    pos[index] = thisPos;
 }
 
 // LOOK-2.1 Consider this method of computing a 1D index from a 3D grid index.
@@ -357,8 +403,18 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
 * Step the entire N-body simulation by `dt` seconds.
 */
 void Boids::stepSimulationNaive(float dt) {
-  // TODO-1.2 - use the kernels you wrote to step the simulation forward in time.
-  // TODO-1.2 ping-pong the velocity buffers
+    // TODO-1.2 - use the kernels you wrote to step the simulation forward in time.
+    static int curVelBuffer = 0;
+    glm::vec3* prevBuffer = (curVelBuffer == 1) ? dev_vel2 : dev_vel1;
+    glm::vec3* curBuffer = (curVelBuffer == 1) ? dev_vel1 : dev_vel2;
+
+    dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
+
+    kernUpdateVelocityBruteForce<<<fullBlocksPerGrid, blockSize>>>(numObjects, dev_pos, prevBuffer, curBuffer);
+    kernUpdatePos<<<fullBlocksPerGrid, blockSize>>>(numObjects, dt, dev_pos, curBuffer);
+
+    // TODO-1.2 ping-pong the velocity buffers
+    curVelBuffer = (curVelBuffer + 1) % 2;
 }
 
 void Boids::stepSimulationScatteredGrid(float dt) {
