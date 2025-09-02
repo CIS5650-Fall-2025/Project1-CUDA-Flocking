@@ -250,7 +250,7 @@ __device__ glm::vec3 computeVelocityChange(int N, int iSelf, const glm::vec3 *po
 
     for (int i = 0;i < N;i++) {
         //Dist between current boid and original boid
-        float dist = glm::length(pos[i] - pos[iSelf]);
+        float dist = glm::distance(pos[i], pos[iSelf]);
 
         //Rule 1
         if (i != iSelf && dist<rule1Distance) {
@@ -271,14 +271,14 @@ __device__ glm::vec3 computeVelocityChange(int N, int iSelf, const glm::vec3 *po
     }
 
     //Divide by number of neighbors for pos and vel
-    if (count1 > 0) percieved_center /= count1;
-    if (count3 > 0) percieved_velocity /= count3;
+    if (count1 > 0) percieved_center /= (float) count1;
+    if (count3 > 0) percieved_velocity /= (float) count3;
 
 
     //Scale each computed vel
-    glm::vec3 v1 = (percieved_center - pos[iSelf]) * rule1Scale;
+    glm::vec3 v1 = count1 > 0 ? (percieved_center - pos[iSelf]) * rule1Scale : glm::vec3(0.);
     glm::vec3 v2 = c * rule2Scale;
-    glm::vec3 v3 = (percieved_velocity - vel[iSelf]) * rule3Scale;
+    glm::vec3 v3 = count3 > 0 ? (percieved_velocity - vel[iSelf]) * rule3Scale : glm::vec3(0.);
 
     //return accumulated dv
     return v1 + v2 + v3;
@@ -409,6 +409,7 @@ void Boids::stepSimulationNaive(float dt) {
     dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
     kernUpdateVelocityBruteForce<<<fullBlocksPerGrid, blockSize >>>(
         numObjects, dev_pos, dev_vel1, dev_vel2);
+
     glm::vec3* temp = dev_vel1;
     dev_vel1 = dev_vel2;
     dev_vel2 = temp;
