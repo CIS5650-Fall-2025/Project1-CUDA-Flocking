@@ -183,9 +183,9 @@ void Boids::initSimulation(int N) {
   checkCUDAErrorWithLine("cudaMalloc dev_particleArrayIndices failed!");
   cudaMalloc((void**)&dev_particleGridIndices, N * sizeof(int));
   checkCUDAErrorWithLine("cudaMalloc dev_particleGridIndices failed!");
-  cudaMalloc((void**)&dev_gridCellStartIndices, N * sizeof(int));
+  cudaMalloc((void**)&dev_gridCellStartIndices, gridCellCount * sizeof(int));
   checkCUDAErrorWithLine("cudaMalloc dev_gridCellStartIndices failed!");
-  cudaMalloc((void**)&dev_gridCellEndIndices, N * sizeof(int));
+  cudaMalloc((void**)&dev_gridCellEndIndices, gridCellCount * sizeof(int));
   checkCUDAErrorWithLine("cudaMalloc dev_gridCellEndIndices failed!");
 
   cudaDeviceSynchronize();
@@ -380,8 +380,15 @@ __global__ void kernIdentifyCellStartEnd(int N, int *particleGridIndices,
   // This is basically a parallel unrolling of a loop that goes
   // "this index doesn't match the one before it, must be a new cell!"
     int index = threadIdx.x + (blockIdx.x * blockDim.x);
-    if (index >= N - 1) {
+    if (index >= N) {
         return;
+    }
+    if (index == N - 1) {
+        gridCellEndIndices[particleGridIndices[index]] = index;
+        return;
+    }
+    if (index == 0) {
+        gridCellStartIndices[particleGridIndices[index]] = index;
     }
     // TODO should this store value rather than access via array twice? does that affect performance either well or poorly? I assume negligible in this case
     if (particleGridIndices[index] != particleGridIndices[index + 1]) {
@@ -430,19 +437,19 @@ __global__ void kernUpdateVelNeighborSearchScattered(
                 for (int i = startIndex; i <= endIndex; ++i) {
                     int otherIndex = particleArrayIndices[i];
                     if (otherIndex != index) {
+                        float dist = glm::length(pos[otherIndex] - pos[index]);
                         // Rule 1: boids fly towards their local perceived center of mass, which excludes themselves
-                        if (glm::length(pos[otherIndex] - pos[index]) < rule1Distance) {
+                        if (dist < rule1Distance) {
                             perceivedCenter += pos[otherIndex];
                             ++neighbors1;
 
                         }
                         // Rule 2: boids try to stay a distance d away from each other
-
-                        if (glm::length(pos[otherIndex] - pos[index]) < rule2Distance) {
+                        if (dist < rule2Distance) {
                             c -= pos[otherIndex] - pos[index];
                         }
                         // Rule 3: boids try to match the speed of surrounding boids
-                        if (glm::length(pos[otherIndex] - pos[index]) < rule3Distance) {
+                        if (dist < rule3Distance) {
                             perceivedVelocity += vel1[otherIndex];
                             ++neighbors3;
                         }
@@ -522,8 +529,14 @@ void Boids::stepSimulationScatteredGrid(float dt) {
 
   // - Naively unroll the loop for finding the start and end indices of each
   //   cell's data pointers in the array of boid indices
+    //cudaMemset(dev_gridCellStartIndices, 0, gridCellCount * sizeof(int));
+    cudaMemset(dev_gridCellEndIndices, -1, gridCellCount * sizeof(int));
+    //^TODO is there a better way to ensure blanks not accessed?
+    //  I guess technically start doesn't all need to be 0, since still won't loop through if end -1; TODO figure out if better to do that or if not to and to have check to add 0 when index 0
     kernIdentifyCellStartEnd<<<fullBlocksPerGrid, blockSize>>>(numObjects, dev_particleGridIndices, dev_gridCellStartIndices, dev_gridCellEndIndices);
   // - Perform velocity updates using neighbor search
+    // TODO this performs poorly--I think an issue with start/end finding?
+    //   ^ Improved and now at least runs better than naive but not amazing, unsure how much up to hardware or if can still improve
     kernUpdateVelNeighborSearchScattered<<<fullBlocksPerGrid, blockSize>>>(numObjects, gridSideCount, gridMinimum, gridInverseCellWidth, gridCellWidth, dev_gridCellStartIndices, dev_gridCellEndIndices, dev_particleArrayIndices, dev_pos, dev_vel1, dev_vel2);
   // - Update positions
     kernUpdatePos<<<fullBlocksPerGrid, blockSize >>>(numObjects, dt, dev_pos, dev_vel2);
