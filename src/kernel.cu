@@ -243,11 +243,11 @@ void Boids::copyBoidsToVBO(float *vbodptr_positions, float *vbodptr_velocities) 
 */
 __device__ glm::vec3 computeVelocityChange(int N, int iSelf, const glm::vec3 *pos, const glm::vec3 *vel) {
   glm::vec3 changedVelocity = vel[iSelf];
-  
-  
+      
   glm::vec3 percievedCenter = glm::vec3(0.0f, 0.0f, 0.0f);
   glm::vec3 c = glm::vec3(0.0f, 0.0f, 0.0f);
   glm::vec3 percievedVelocity = glm::vec3(0.0f, 0.0f, 0.0f);
+  glm::vec3 curPos = pos[iSelf];
   int rule1Neighbors = 0;
   int rule3Neighbors = 0;
   for (int i = 0; i < N; i++)
@@ -268,6 +268,7 @@ __device__ glm::vec3 computeVelocityChange(int N, int iSelf, const glm::vec3 *po
       // Rule 3: boids try to match the speed of surrounding boids
       if (glm::distance(pos[i], pos[iSelf]) < rule3Distance)
       {
+        rule3Neighbors++;
         percievedVelocity += vel[i];
       }
     }
@@ -276,11 +277,10 @@ __device__ glm::vec3 computeVelocityChange(int N, int iSelf, const glm::vec3 *po
   if (rule1Neighbors != 0)
   {
     percievedCenter /= rule1Neighbors;
+    glm::vec3 rule1VelChange = (percievedCenter - pos[iSelf]) * rule1Scale;
     changedVelocity += (percievedCenter - pos[iSelf]) * rule1Scale;
   }
-
   changedVelocity += c * rule2Scale;
-
   if (rule3Neighbors != 0)
   {
     percievedVelocity /= rule3Neighbors;
@@ -412,11 +412,14 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
 */
 void Boids::stepSimulationNaive(float dt) {
   // TODO-1.2 - use the kernels you wrote to step the simulation forward in time.
-  glm::vec3 *pos;
-  glm::vec3* vel1;
-  glm::vec3* vel2;
-  cudaMemcpy(dev_pos, pos, sizeof(glm::vec3) * N, cudaMemcpyHostToDevice);
+  dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
+  kernUpdateVelocityBruteForce<<<fullBlocksPerGrid, threadsPerBlock>>>(numObjects, dev_pos, dev_vel1, dev_vel2);
+  checkCUDAErrorWithLine("kernal failure");
+  kernUpdatePos<<<fullBlocksPerGrid, threadsPerBlock>>>(numObjects, dt, dev_pos, dev_vel2);
+  checkCUDAErrorWithLine("kernal failure");
   // TODO-1.2 ping-pong the velocity buffers
+  cudaMemcpy(dev_vel2, dev_vel1, numObjects * sizeof(glm::vec3), cudaMemcpyDeviceToDevice);
+  checkCUDAErrorWithLine("memcpy failure");
 }
 
 void Boids::stepSimulationScatteredGrid(float dt) {
