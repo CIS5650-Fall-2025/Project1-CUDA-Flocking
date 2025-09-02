@@ -48,6 +48,8 @@ void checkCUDAError(const char *msg, int line = -1) {
 * Configuration *
 *****************/
 
+#define gridCellEqualsNeighborhood 0
+
 /*! Block size used for CUDA kernel launch. */
 #define blockSize 128
 
@@ -174,7 +176,11 @@ void Boids::initSimulation(int N) {
 
   // LOOK-2.1 computing grid params
   neighborhoodDistance = std::max(std::max(rule1Distance, rule2Distance), rule3Distance);
+#if gridCellEqualsNeighborhood
+  gridCellWidth = neighborhoodDistance;
+#else
   gridCellWidth = 2.0f * neighborhoodDistance;
+#endif
   int halfSideCount = (int)(scene_scale / gridCellWidth) + 1;
   gridSideCount = 2 * halfSideCount;
 
