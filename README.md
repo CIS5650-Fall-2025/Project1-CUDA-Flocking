@@ -151,7 +151,7 @@ One thing I notice is that there are a lot of empty bubbles between each group o
 
 ![bubbles](images/new_gpu/gpuview_serial.png)
 
-For every bubble in graphics, the time interval overlaps with compute work, and it's the same vice versa. We can see that graphics work per frame comes after a group of compute work. Within each queue individually a considerable amount of time in the frame is being spent not having work to do: ideally we want to always be submitting work as much as possible to fully saturate the hardware. 
+For every bubble in graphics, the time interval overlaps with compute work, and it's the same vice versa. We can see that graphics work per frame comes after a group of compute work. Within each queue individually a considerable amount of time in the frame is being spent not processing work: ideally we want to always be submitting work as much as possible to fully saturate the hardware. 
 
 Looking at what the GPU is doing, we can see holes too (since it is underutilized):
 
