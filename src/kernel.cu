@@ -249,8 +249,11 @@ __device__ glm::vec3 computeVelocityChange(int N, int iSelf, const glm::vec3 *po
             ++neighbors;
         }
     }
-    perceivedCenter /= neighbors;
-    glm::vec3 resultVel = (perceivedCenter - pos[iSelf]) * rule1Scale;
+    glm::vec3 resultVel = glm::vec3(0.f);
+    if (neighbors > 0) {
+        perceivedCenter /= neighbors;
+        resultVel = (perceivedCenter - pos[iSelf]) * rule1Scale;
+    }
   // Rule 2: boids try to stay a distance d away from each other
     glm::vec3 c = glm::vec3(0.f);
 
@@ -271,8 +274,11 @@ __device__ glm::vec3 computeVelocityChange(int N, int iSelf, const glm::vec3 *po
             ++neighbors3;
         }
     }
-    perceivedVelocity /= neighbors3;
+    if (neighbors3 > 0) {
+        perceivedVelocity /= neighbors3;
+    }
     resultVel += perceivedVelocity * rule3Scale; //TODO maybe swap to other version
+    //resultVel += (perceivedVelocity - vel[iSelf]) * rule3Scale; //form from Conrad Parker's notes
 
     return resultVel;
 }
@@ -290,7 +296,7 @@ __global__ void kernUpdateVelocityBruteForce(int N, glm::vec3 *pos,
     if (index >= N) {
         return;
     }
-    glm::vec3 resultVel = computeVelocityChange(N, index, pos, vel1);
+    glm::vec3 resultVel = vel1[index] + computeVelocityChange(N, index, pos, vel1);
     if (glm::length(resultVel) > maxSpeed) {
         resultVel = glm::normalize(resultVel) * maxSpeed;
         // TODO not sure best way about that
