@@ -51,7 +51,7 @@ void checkCUDAError(const char *msg, int line = -1) {
 
 // LOOK-1.2 Parameters for the boids algorithm.
 // These worked well in our reference implementation.
-#define rule1Distance 5.0f
+#define rule1Distance 10.0f
 #define rule2Distance 3.0f
 #define rule3Distance 5.0f
 
@@ -59,7 +59,7 @@ void checkCUDAError(const char *msg, int line = -1) {
 #define rule2Scale 0.1f
 #define rule3Scale 0.1f
 
-#define maxSpeed 1.0f
+#define maxSpeed 3.0f
 
 /*! Size of the starting area in simulation space. */
 #define scene_scale 100.0f
@@ -240,10 +240,63 @@ void Boids::copyBoidsToVBO(float *vbodptr_positions, float *vbodptr_velocities) 
 * in the `pos` and `vel` arrays.
 */
 __device__ glm::vec3 computeVelocityChange(int N, int iSelf, const glm::vec3 *pos, const glm::vec3 *vel) {
+   //init self pos and vel
+    glm::vec3 currentPos = pos[iSelf];
+    glm::vec3 currentVel = vel[iSelf];
+
   // Rule 1: boids fly towards their local perceived center of mass, which excludes themselves
+    glm::vec3 rule1Vec = glm::vec3(0.0f);
+    int rule1Neighbors = 0;
+
   // Rule 2: boids try to stay a distance d away from each other
+    glm::vec3 rule2Vec = glm::vec3(0.0f);
+    int rule2Neighbors = 0;
+
   // Rule 3: boids try to match the speed of surrounding boids
-  return glm::vec3(0.0f, 0.0f, 0.0f);
+    glm::vec3 rule3Vec = glm::vec3(0.0f);
+    int rule3Neighbors = 0;
+
+    for (int i = 0; i < N; i++) {
+
+        if (i == iSelf) {
+            continue;
+        }
+
+        glm::vec3 neighborsPos = pos[i];
+        float dist = glm::distance(currentPos, neighborsPos);
+
+        if (dist < rule1Distance) {
+            rule1Vec += neighborsPos;
+            rule1Neighbors++;
+        }
+
+        if (dist < rule2Distance) {
+            rule2Vec -= neighborsPos - currentPos;
+        }
+
+        if (dist < rule3Distance) {
+            rule3Vec += vel[i];
+            rule3Neighbors++;
+        }
+    }
+
+    //rule1
+    if (rule1Neighbors > 0) {
+        rule1Vec /= rule1Neighbors;
+        rule1Vec = (rule1Vec - currentPos) * rule1Scale;
+    }
+
+    //rule2
+    rule2Vec *= rule2Scale;
+
+    //rule3
+    if (rule3Neighbors > 0) {
+        rule3Vec /= rule3Neighbors;
+        rule3Vec *= rule3Scale;
+    }
+
+  //return glm::vec3(0.0f, 0.0f, 0.0f);
+    return rule1Vec + rule2Vec + rule3Vec;
 }
 
 /**
@@ -252,9 +305,24 @@ __device__ glm::vec3 computeVelocityChange(int N, int iSelf, const glm::vec3 *po
 */
 __global__ void kernUpdateVelocityBruteForce(int N, glm::vec3 *pos,
   glm::vec3 *vel1, glm::vec3 *vel2) {
+
+    unsigned int threadIndex = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (threadIndex >= N) {
+        return;
+    }
   // Compute a new velocity based on pos and vel1
   // Clamp the speed
   // Record the new velocity into vel2. Question: why NOT vel1?
+
+    glm::vec3 forceVec = computeVelocityChange(N, threadIndex, pos, vel1);
+    glm::vec3 finalVec = vel1[threadIndex] + forceVec;
+
+    if (glm::length(finalVec) > maxSpeed) {
+        finalVec = glm::normalize(finalVec) * maxSpeed;
+    }
+
+    vel2[threadIndex] = finalVec;
 }
 
 /**
@@ -355,10 +423,17 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
 
 /**
 * Step the entire N-body simulation by `dt` seconds.
+* dt means like delta time - timestep
+* so for this function I should run kernelUpdateVelocityBruteForce, and update self position 
 */
 void Boids::stepSimulationNaive(float dt) {
+    dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
+
   // TODO-1.2 - use the kernels you wrote to step the simulation forward in time.
+    kernUpdateVelocityBruteForce <<<fullBlocksPerGrid, threadsPerBlock >>> (numObjects, dev_pos, dev_vel1, dev_vel2);
+    kernUpdatePos <<<fullBlocksPerGrid, threadsPerBlock >>> (numObjects, dt, dev_pos, dev_vel2);
   // TODO-1.2 ping-pong the velocity buffers
+    std::swap(dev_vel1, dev_vel2);
 }
 
 void Boids::stepSimulationScatteredGrid(float dt) {
