@@ -13,9 +13,11 @@ Project 1 - Flocking**
 
 ![](images/boid2.gif)
 
-![](images/boid3.gif)
-
 ![](images/boid4.gif)
+
+### Extra Credit
+
+Implemented "Grid-Looping Optimization". In kernel.cu, please search for "Extra Credit" to see the code. Only add to uniform grid as an example.
 
 ### Performance Analysis
 

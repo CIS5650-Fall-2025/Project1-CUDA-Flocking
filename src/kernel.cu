@@ -509,6 +509,43 @@ __global__ void kernUpdateVelNeighborSearchScattered(
         dz0 = -1; dz1 = 1;
     }
 
+    /////////////////////////
+    ///// Extra Credit //////
+    /////////////////////////
+
+    float Rcells = R * inverseCellWidth;
+
+    int rx_neg = (int)ceilf(fmaxf(0.0f, Rcells - fx));
+    int rx_pos = (int)ceilf(fmaxf(0.0f, Rcells - (1.0f - fx)));
+    int ry_neg = (int)ceilf(fmaxf(0.0f, Rcells - fy));
+    int ry_pos = (int)ceilf(fmaxf(0.0f, Rcells - (1.0f - fy)));
+    int rz_neg = (int)ceilf(fmaxf(0.0f, Rcells - fz));
+    int rz_pos = (int)ceilf(fmaxf(0.0f, Rcells - (1.0f - fz)));
+
+    int startX = gx - rx_neg; if (startX < 0) startX = 0;
+    int endX = gx + rx_pos; if (endX > gridResolution - 1) endX = gridResolution - 1;
+
+    int startY = gy - ry_neg; if (startY < 0) startY = 0;
+    int endY = gy + ry_pos; if (endY > gridResolution - 1) endY = gridResolution - 1;
+
+    int startZ = gz - rz_neg; if (startZ < 0) startZ = 0;
+    int endZ = gz + rz_pos; if (endZ > gridResolution - 1) endZ = gridResolution - 1;
+
+    // Example of modified loop
+    for (int nz = startZ; nz <= endZ; ++nz) {
+        break;
+        for (int ny = startY; ny <= endY; ++ny) {
+            break;
+            for (int nx = startX; nx <= endX; ++nx) { 
+                break; 
+            }
+        }
+    }
+
+    /////////////////////////
+    // End Of Extra Credit //
+    /////////////////////////
+
     glm::vec3 perceivedCenter(0.0f, 0.0f, 0.0f);
     glm::vec3 c(0.0f, 0.0f, 0.0f);
     glm::vec3 perceivedVelocity(0.0f, 0.0f, 0.0f);
