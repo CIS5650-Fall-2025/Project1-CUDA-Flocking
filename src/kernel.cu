@@ -387,9 +387,9 @@ __global__ void kernIdentifyCellStartEnd(int N, int *particleGridIndices,
         gridCellEndIndices[particleGridIndices[index]] = index;
         return;
     }
-    if (index == 0) {
-        gridCellStartIndices[particleGridIndices[index]] = index;
-    }
+    //if (index == 0) {
+    //    gridCellStartIndices[particleGridIndices[index]] = index;
+    //}
     // TODO should this store value rather than access via array twice? does that affect performance either well or poorly? I assume negligible in this case
     if (particleGridIndices[index] != particleGridIndices[index + 1]) {
         gridCellStartIndices[particleGridIndices[index + 1]] = index + 1;
@@ -410,7 +410,7 @@ __global__ void kernUpdateVelNeighborSearchScattered(
     if (index >= N) {
         return;
     }
-    glm::ivec3 cellPos = (pos[index] - gridMin) * inverseCellWidth + 0.5f; // TODO make sure offset right (want to step over to be centered on nearest corner of cell)
+    glm::ivec3 cellPos = glm::ivec3((pos[index] - gridMin) * inverseCellWidth + 0.5f); // TODO make sure offset right (want to step over to be centered on nearest corner of cell)
   // - Identify which cells may contain neighbors. This isn't always 8.
     glm::ivec3 minCell = glm::max(cellPos - 1, 0);
     glm::ivec3 maxCell = glm::min(cellPos, N - 1); // TODO make sure max/min works for this
@@ -522,14 +522,14 @@ void Boids::stepSimulationScatteredGrid(float dt) {
     kernComputeIndices<<<fullBlocksPerGrid, blockSize>>>(numObjects, gridSideCount, gridMinimum, gridInverseCellWidth, dev_pos, dev_particleArrayIndices, dev_particleGridIndices);
   // - Unstable key sort using Thrust. A stable sort isn't necessary, but you
   //   are welcome to do a performance comparison.
-    dev_thrust_particleArrayIndices = thrust::device_ptr<int>(dev_particleArrayIndices);
-    dev_thrust_particleGridIndices = thrust::device_ptr<int>(dev_particleGridIndices);
+    dev_thrust_particleArrayIndices = thrust::device_ptr<int>(dev_particleGridIndices);
+    dev_thrust_particleGridIndices = thrust::device_ptr<int>(dev_particleArrayIndices);
     // LOOK-2.1 Example for using thrust::sort_by_key
     thrust::sort_by_key(dev_thrust_particleArrayIndices, dev_thrust_particleArrayIndices + numObjects, dev_thrust_particleGridIndices);
 
   // - Naively unroll the loop for finding the start and end indices of each
   //   cell's data pointers in the array of boid indices
-    //cudaMemset(dev_gridCellStartIndices, 0, gridCellCount * sizeof(int));
+    cudaMemset(dev_gridCellStartIndices, 0, gridCellCount * sizeof(int));
     cudaMemset(dev_gridCellEndIndices, -1, gridCellCount * sizeof(int));
     //^TODO is there a better way to ensure blanks not accessed?
     //  I guess technically start doesn't all need to be 0, since still won't loop through if end -1; TODO figure out if better to do that or if not to and to have check to add 0 when index 0
