@@ -111,6 +111,8 @@ int gridSideCount;
 float gridCellWidth;
 float gridInverseCellWidth;
 glm::vec3 gridMinimum;
+// extra param added
+float maxRuleDist;
 
 /******************
 * initSimulation *
@@ -175,7 +177,8 @@ void Boids::initSimulation(int N) {
   checkCUDAErrorWithLine("kernGenerateRandomPosArray failed!");
 
   // LOOK-2.1 computing grid params
-  gridCellWidth = 2.0f * std::max(std::max(rule1Distance, rule2Distance), rule3Distance);
+  maxRuleDist = std::max(std::max(rule1Distance, rule2Distance), rule3Distance);
+  gridCellWidth = 2.0f * maxRuleDist;
   int halfSideCount = (int)(scene_scale / gridCellWidth) + 1;
   gridSideCount = 2 * halfSideCount;
 
@@ -434,7 +437,7 @@ __global__ void kernUpdateVelNeighborSearchScattered(
   float inverseCellWidth, float cellWidth,
   int *gridCellStartIndices, int *gridCellEndIndices,
   int *particleArrayIndices,
-  glm::vec3 *pos, glm::vec3 *vel1, glm::vec3 *vel2) {
+  glm::vec3 *pos, glm::vec3 *vel1, glm::vec3 *vel2, float maxRuleDist) {
   // TODO-2.1 - Update a boid's velocity using the uniform grid to reduce
   // the number of boids that need to be checked.
   // - Identify the grid cell that this particle is in
@@ -442,7 +445,6 @@ __global__ void kernUpdateVelNeighborSearchScattered(
     if (tIdx >= N) return;
     int currBoid = particleArrayIndices[tIdx];
     glm::ivec3 relativePos = glm::ivec3((pos[currBoid] - gridMin) * inverseCellWidth);
-    //int currGrid = gridIndex3Dto1D(relativePos.x, relativePos.y, relativePos.z, gridResolution);
   // - Identify which cells may contain neighbors. This isn't always 8.
 
     // vars for the rules
@@ -450,12 +452,14 @@ __global__ void kernUpdateVelNeighborSearchScattered(
     int numNeighbors3 = 0;
     glm::vec3 perceived_center(0.f), c(0.f), perceived_vel(0.f);
 
-    int minX = imax(relativePos.x - 1, 0);
-    int minY = imax(relativePos.y - 1, 0);
-    int minZ = imax(relativePos.z - 1, 0);
-    int maxX = imin(relativePos.x + 1, gridResolution - 1);
-    int maxY = imin(relativePos.y + 1, gridResolution - 1);
-    int maxZ = imin(relativePos.z + 1, gridResolution - 1);
+    float cellOffset = maxRuleDist * inverseCellWidth;
+
+    int minX = imax(relativePos.x - cellOffset, 0);
+    int minY = imax(relativePos.y - cellOffset, 0);
+    int minZ = imax(relativePos.z - cellOffset, 0);
+    int maxX = imin(relativePos.x + cellOffset, gridResolution - 1);
+    int maxY = imin(relativePos.y + cellOffset, gridResolution - 1);
+    int maxZ = imin(relativePos.z + cellOffset, gridResolution - 1);
 
     for (int z = minZ; z <= maxZ; ++z)
     {
@@ -518,7 +522,7 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
   int N, int gridResolution, glm::vec3 gridMin,
   float inverseCellWidth, float cellWidth,
   int *gridCellStartIndices, int *gridCellEndIndices,
-  glm::vec3 *pos, glm::vec3 *vel1, glm::vec3 *vel2) {
+  glm::vec3 *pos, glm::vec3 *vel1, glm::vec3 *vel2, float maxRuleDist) {
   // TODO-2.3 - This should be very similar to kernUpdateVelNeighborSearchScattered,
   // except with one less level of indirection.
   // This should expect gridCellStartIndices and gridCellEndIndices to refer
@@ -533,12 +537,14 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
     int numNeighbors3 = 0;
     glm::vec3 perceived_center(0.f), c(0.f), perceived_vel(0.f);
 
-    int minX = imax(relativePos.x - 1, 0);
-    int minY = imax(relativePos.y - 1, 0);
-    int minZ = imax(relativePos.z - 1, 0);
-    int maxX = imin(relativePos.x + 1, gridResolution - 1);
-    int maxY = imin(relativePos.y + 1, gridResolution - 1);
-    int maxZ = imin(relativePos.z + 1, gridResolution - 1);
+    float cellOffset = maxRuleDist * inverseCellWidth;
+
+    int minX = imax(relativePos.x - cellOffset, 0);
+    int minY = imax(relativePos.y - cellOffset, 0);
+    int minZ = imax(relativePos.z - cellOffset, 0);
+    int maxX = imin(relativePos.x + cellOffset, gridResolution - 1);
+    int maxY = imin(relativePos.y + cellOffset, gridResolution - 1);
+    int maxZ = imin(relativePos.z + cellOffset, gridResolution - 1);
     for (int z = minZ; z <= maxZ; ++z)
     {
         for (int y = minY; y <= maxY; ++y)
@@ -648,7 +654,7 @@ void Boids::stepSimulationScatteredGrid(float dt) {
     kernIdentifyCellStartEnd << <fullBlocksPerGrid, blockSize >> > (numObjects, dev_particleGridIndices, dev_gridCellStartIndices, dev_gridCellEndIndices);
   // - Perform velocity updates using neighbor search
     kernUpdateVelNeighborSearchScattered << <fullBlocksPerGrid, blockSize >> > (numObjects, gridSideCount, gridMinimum, gridInverseCellWidth, gridCellWidth,
-                                                                                dev_gridCellStartIndices, dev_gridCellEndIndices, dev_particleArrayIndices, dev_pos, dev_vel1, dev_vel2);
+                                                                                dev_gridCellStartIndices, dev_gridCellEndIndices, dev_particleArrayIndices, dev_pos, dev_vel1, dev_vel2, maxRuleDist);
   // - Update positions
     kernUpdatePos<<<fullBlocksPerGrid, blockSize>>>(numObjects, dt, dev_pos, dev_vel2);
   // - Ping-pong buffers as needed
@@ -680,7 +686,7 @@ void Boids::stepSimulationCoherentGrid(float dt) {
     kernelSortArrays << <fullBlocksPerGrid, blockSize >> > (numObjects, dev_pos, dev_sortedPos, dev_vel1, dev_sortedVel1, dev_particleArrayIndices);
   // - Perform velocity updates using neighbor search
     kernUpdateVelNeighborSearchCoherent<<<fullBlocksPerGrid, blockSize>>>(numObjects, gridSideCount, gridMinimum, gridInverseCellWidth, gridCellWidth,
-                                                                                dev_gridCellStartIndices, dev_gridCellEndIndices, dev_sortedPos, dev_sortedVel1, dev_sortedVel2);
+                                                                                dev_gridCellStartIndices, dev_gridCellEndIndices, dev_sortedPos, dev_sortedVel1, dev_sortedVel2, maxRuleDist);
   // - Update positions
     kernUpdatePos << <fullBlocksPerGrid, blockSize >> > (numObjects, dt, dev_sortedPos, dev_sortedVel2);
   // - Ping-pong buffers as needed. THIS MAY BE DIFFERENT FROM BEFORE.
