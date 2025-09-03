@@ -85,6 +85,8 @@ glm::vec3 *dev_vel2;
 // LOOK-2.1 - these are NOT allocated for you. You'll have to set up the thrust
 // pointers on your own too.
 
+
+
 // For efficient sorting and the uniform grid. These should always be parallel.
 int *dev_particleArrayIndices; // What index in dev_pos and dev_velX represents this particle?
 int *dev_particleGridIndices; // What grid cell is this particle in?
@@ -352,6 +354,18 @@ __global__ void kernComputeIndices(int N, int gridResolution,
     // - Label each boid with the index of its grid cell.
     // - Set up a parallel array of integer indices as pointers to the actual
     //   boid data in pos and vel1/vel2
+    int index = (blockIdx.x * blockDim.x) + threadIdx.x;
+    for (int i = 0; i < N; i++)
+    {
+        indices[index] = N;
+        //Compute which grid cell boid is in.
+        int gridIndexX = (int)((pos[index].x - gridMin.x) * inverseCellWidth);
+        int gridIndexY = (int)((pos[index].y - gridMin.y) * inverseCellWidth);
+        int gridIndexZ = (int)((pos[index].z - gridMin.z) * inverseCellWidth);
+
+        int gridIndex = gridIndexX + gridIndexY * gridResolution + gridIndexZ * gridResolution * gridResolution;
+        gridIndices[index] = gridIndex;
+    }
 }
 
 // LOOK-2.1 Consider how this could be useful for indicating that a cell
