@@ -243,7 +243,47 @@ __device__ glm::vec3 computeVelocityChange(int N, int iSelf, const glm::vec3 *po
   // Rule 1: boids fly towards their local perceived center of mass, which excludes themselves
   // Rule 2: boids try to stay a distance d away from each other
   // Rule 3: boids try to match the speed of surrounding boids
-  return glm::vec3(0.0f, 0.0f, 0.0f);
+  glm::vec3 velocity(0.0f);
+  glm::vec3 perceived_center(0.0f);
+  glm::vec3 c(0.0f);
+  glm::vec3 perceived_velocity(0.0f);
+  int neighborCount1 = 0;
+  int neighborCount3 = 0;
+  for (int i = 0; i < N; ++i) {
+      if (i == iSelf) {
+          continue;
+      }
+      float distance = glm::distance(pos[iSelf], pos[i]);
+
+      // Rule 1
+      if (distance < rule1Distance) {
+          // Add the position of the other boid to the perceived center of mass
+          perceived_center += pos[i];
+		  neighborCount1++;
+      }
+      // Rule 2
+      if (distance < rule2Distance) {
+		  c -= (pos[i] - pos[iSelf]);
+      }
+	  // Rule 3
+      if (distance < rule3Distance) {
+          perceived_velocity += vel[i];
+		  neighborCount3++;
+	  }
+  }
+  if (neighborCount1 > 0) {
+      perceived_center /= (float)neighborCount1;
+      velocity += (perceived_center - pos[iSelf]) * rule1Scale;
+  }
+  
+  velocity += c * rule2Scale;
+  
+  if (neighborCount3 > 0) {
+      perceived_velocity /= (float)neighborCount3;
+      velocity += perceived_velocity * rule3Scale;
+  }
+
+  return velocity;
 }
 
 /**
@@ -371,6 +411,15 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
 void Boids::stepSimulationNaive(float dt) {
   // TODO-1.2 - use the kernels you wrote to step the simulation forward in time.
   // TODO-1.2 ping-pong the velocity buffers
+	dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
+	kernUpdateVelocityBruteForce<<<fullBlocksPerGrid, blockSize>>> (numObjects, dev_pos, dev_vel1, dev_vel2);
+	checkCUDAErrorWithLine("kernUpdateVelocityBruteForce failed!");
+	kernUpdatePos<<<fullBlocksPerGrid, blockSize>>> (numObjects, dt, dev_pos, dev_vel2);
+	checkCUDAErrorWithLine("kernUpdatePos failed!");
+	glm::vec3* temp = dev_vel1;
+	dev_vel1 = dev_vel2;
+	dev_vel2 = temp;
+
 }
 
 void Boids::stepSimulationScatteredGrid(float dt) {
