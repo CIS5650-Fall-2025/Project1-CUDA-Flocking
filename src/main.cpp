@@ -22,12 +22,13 @@
 // ================
 
 // LOOK-2.1 LOOK-2.3 - toggles for UNIFORM_GRID and COHERENT_GRID
-#define VISUALIZE 1
+#define VISUALIZE 0
 #define UNIFORM_GRID 1
 #define COHERENT_GRID 1
+#define SHARED_MEMORY 1
 
 // LOOK-1.2 - change this to adjust particle count in the simulation
-const int N_FOR_VIS = 25000;
+const int N_FOR_VIS = 5000;
 const float DT = 0.2f;
 
 /**
@@ -207,7 +208,11 @@ void runCUDA() {
 
 	// execute the kernel
 #if UNIFORM_GRID && COHERENT_GRID
+#if SHARED_MEMORY
+	Boids::stepSimulationCoherentGridSharedMem(DT);
+#else
 	Boids::stepSimulationCoherentGrid(DT);
+#endif
 #elif UNIFORM_GRID
 	Boids::stepSimulationScatteredGrid(DT);
 #else
@@ -235,11 +240,13 @@ void mainLoop() {
 
 		frame++;
 		double time = glfwGetTime();
+		bool shouldDrawOverride = false;
 
 		if (time - timebase > 1.0) {
 			fps = frame / (time - timebase);
 			timebase = time;
 			frame = 0;
+			shouldDrawOverride = true;
 		}
 
 		runCUDA();
@@ -264,6 +271,20 @@ void mainLoop() {
 		glBindVertexArray(0);
 
 		glfwSwapBuffers(window);
+#else
+		if (shouldDrawOverride) {
+			glUseProgram(program[PROG_BOID]);
+			glBindVertexArray(boidVAO);
+			glPointSize((GLfloat)pointSize);
+			glDrawElements(GL_POINTS, N_FOR_VIS + 1, GL_UNSIGNED_INT, 0);
+			glPointSize(1.0f);
+
+			glUseProgram(0);
+			glBindVertexArray(0);
+
+			glfwSwapBuffers(window);
+			shouldDrawOverride = false;
+		}
 #endif
 	}
 	glfwDestroyWindow(window);
