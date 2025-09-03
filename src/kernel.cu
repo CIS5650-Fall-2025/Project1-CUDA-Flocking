@@ -304,8 +304,7 @@ __global__ void kernUpdateVelocityBruteForce(int N, glm::vec3 *pos,
       return;
   }
   glm::vec3 changedVel = computeVelocityChange(N, index, pos, vel1);
-  //Clamp
-  glm::clamp(changedVel, -maxSpeed, maxSpeed);
+  changedVel = glm::clamp(changedVel, -maxSpeed, maxSpeed);
   vel2[index] = changedVel;
 
 
@@ -418,8 +417,14 @@ void Boids::stepSimulationNaive(float dt) {
   kernUpdatePos<<<fullBlocksPerGrid, threadsPerBlock>>>(numObjects, dt, dev_pos, dev_vel2);
   checkCUDAErrorWithLine("kernal failure");
   // TODO-1.2 ping-pong the velocity buffers
-  cudaMemcpy(dev_vel2, dev_vel1, numObjects * sizeof(glm::vec3), cudaMemcpyDeviceToDevice);
-  checkCUDAErrorWithLine("memcpy failure");
+  // Unecessary copy, can just swap which vel we send for same effect
+  //cudaMemcpy(dev_vel1, dev_vel2, numObjects * sizeof(glm::vec3), cudaMemcpyDeviceToDevice);
+  
+  glm::vec3* tempVel = dev_vel2;
+  dev_vel2 = dev_vel1;
+  dev_vel1 = tempVel;
+  
+  
 }
 
 void Boids::stepSimulationScatteredGrid(float dt) {
