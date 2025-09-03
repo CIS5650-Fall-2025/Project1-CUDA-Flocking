@@ -64,6 +64,12 @@ void checkCUDAError(const char *msg, int line = -1) {
 /*! Size of the starting area in simulation space. */
 #define scene_scale 100.0f
 
+
+
+// 2.2 alternate neighborhood distance
+// seems to perform much worse for me
+#define useShortNeighborHoodDistance 0
+
 /***********************************************
 * Kernel state (pointers are device pointers) *
 ***********************************************/
@@ -167,7 +173,11 @@ void Boids::initSimulation(int N) {
   checkCUDAErrorWithLine("kernGenerateRandomPosArray failed!");
 
   // LOOK-2.1 computing grid params
+#if useShortNeighborHoodDistance
+  gridCellWidth = std::max(std::max(rule1Distance, rule2Distance), rule3Distance);
+#else
   gridCellWidth = 2.0f * std::max(std::max(rule1Distance, rule2Distance), rule3Distance);
+#endif
   int halfSideCount = (int)(scene_scale / gridCellWidth) + 1;
   gridSideCount = 2 * halfSideCount;
 
@@ -410,12 +420,20 @@ __global__ void kernUpdateVelNeighborSearchScattered(
     if (index >= N) {
         return;
     }
+#if useShortNeighborHoodDistance
+    glm::ivec3 cellPos = glm::ivec3((pos[index] - gridMin) * inverseCellWidth); // TODO make sure offset right (want to step over to be centered on nearest corner of cell)
+  // - Identify which cells may contain neighbors. This isn't always 8.
+    glm::ivec3 minCell = glm::max(cellPos - 1, 0);
+    glm::ivec3 maxCell = glm::min(cellPos + 1, N - 1); // TODO make sure max/min works for this
+    // TODO might be better to convert to 1d first and add/subtract offsets? though then I guess need ifs for edges
+    
+#else
     glm::ivec3 cellPos = glm::ivec3((pos[index] - gridMin) * inverseCellWidth + 0.5f); // TODO make sure offset right (want to step over to be centered on nearest corner of cell)
   // - Identify which cells may contain neighbors. This isn't always 8.
     glm::ivec3 minCell = glm::max(cellPos - 1, 0);
     glm::ivec3 maxCell = glm::min(cellPos, N - 1); // TODO make sure max/min works for this
     // TODO might be better to convert to 1d first and add/subtract offsets? though then I guess need ifs for edges
-    
+#endif
   // - For each cell, read the start/end indices in the boid pointer array.
     glm::vec3 resultVel = vel1[index];
     glm::vec3 perceivedCenter = glm::vec3(0.f);
