@@ -731,6 +731,8 @@ void Boids::endSimulation() {
 	cudaFree(dev_particleGridIndices);
 	cudaFree(dev_gridCellStartIndices);
 	cudaFree(dev_gridCellEndIndices);
+	cudaFree(dev_pos_reshuffled);
+	cudaFree(dev_vel_reshuffled);
 }
 
 void Boids::unitTest() {
