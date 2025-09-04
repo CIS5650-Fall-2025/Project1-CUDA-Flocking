@@ -106,6 +106,8 @@ float gridCellWidth;
 float gridInverseCellWidth;
 glm::vec3 gridMinimum;
 
+int curVelBuffer;
+
 /******************
 * initSimulation *
 ******************/
@@ -162,6 +164,8 @@ void Boids::initSimulation(int N) {
 
 	cudaMalloc((void**)&dev_vel2, N * sizeof(glm::vec3));
 	checkCUDAErrorWithLine("cudaMalloc dev_vel2 failed!");
+
+	curVelBuffer = 0;
 
 	// LOOK-1.2 - This is a typical CUDA kernel invocation.
 	kernGenerateRandomPosArray << <fullBlocksPerGrid, blockSize >> > (1, numObjects,
@@ -241,7 +245,7 @@ void Boids::copyBoidsToVBO(float* vbodptr_positions, float* vbodptr_velocities) 
 	dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
 
 	kernCopyPositionsToVBO << <fullBlocksPerGrid, blockSize >> > (numObjects, dev_pos, vbodptr_positions, scene_scale);
-	kernCopyVelocitiesToVBO << <fullBlocksPerGrid, blockSize >> > (numObjects, dev_vel1, vbodptr_velocities, scene_scale);
+	kernCopyVelocitiesToVBO << <fullBlocksPerGrid, blockSize >> > (numObjects, (curVelBuffer == 1) ? dev_vel2 : dev_vel1, vbodptr_velocities, scene_scale);
 
 	checkCUDAErrorWithLine("copyBoidsToVBO failed!");
 
@@ -523,7 +527,7 @@ __device__ glm::vec3 computeVelocityChangeNeighborCellsCoherent(int N, int iSelf
 
 __device__ glm::vec3 computeVelocityChangeNeighborCellsCoherentSharedMem(int N, int iSelf, int* gridCellStartIndices, int* gridCellEndIndices,
 	const int* const neighborCells, const int neighborCellCount,
-	const glm::vec3* pos, const glm::vec3* vel, const glm::vec3* localPos, const glm::vec3* localVel) {
+	const glm::vec3* pos, const glm::vec3* vel, const glm::vec3* localPos) {
 	// Rule 1: boids fly towards their local perceived center of mass, which excludes themselves
 	// Rule 2: boids try to stay a distance d away from each other
 	// Rule 3: boids try to match the speed of surrounding boids
@@ -532,7 +536,7 @@ __device__ glm::vec3 computeVelocityChangeNeighborCellsCoherentSharedMem(int N, 
 	int neighborCount1 = 0, neighborCount3 = 0;
 	glm::vec3 deltaVelocity(0.f);
 
-	int iThreadIdx = iSelf % blockSize, iBlockIdx = iSelf / blockSize;
+	glm::vec3 pos_i = localPos[threadIdx.x];
 
 	for (int i = 0; i < neighborCellCount; ++i)
 	{
@@ -540,48 +544,25 @@ __device__ glm::vec3 computeVelocityChangeNeighborCellsCoherentSharedMem(int N, 
 		for (int j = gridCellStartIndices[cellIndex]; j <= gridCellEndIndices[cellIndex]; ++j)
 		{
 			if (iSelf == j) continue;
-			int jThreadIdx = j % blockSize, jBlockIdx = j / blockSize;
-			if (iBlockIdx != jBlockIdx) {
-				// cannot use shared memory
-				float distance = glm::length(pos[j] - localPos[iThreadIdx]);
+			glm::vec3 pos_j = (j / blockSize == blockIdx.x) ? localPos[j % blockSize] : pos[j];
 
-				// Rule 1: Cohesion: boids fly towards the center of mass of neighboring boids
-				if (distance < rule1Distance) {
-					center += pos[j];
-					++neighborCount1;
-				}
+			float distance = glm::length(pos_j - pos_i);
 
-				// Rule 2: Separation: boids try to keep a small distance away from each other
-				if (distance < rule2Distance) {
-					separate -= (pos[j] - localPos[iThreadIdx]);
-				}
-
-				// Rule 3: Alignment: boids try to match the velocities of neighboring boids
-				if (distance < rule3Distance) {
-					cohesion += vel[j];
-					++neighborCount3;
-				}
+			// Rule 1: Cohesion: boids fly towards the center of mass of neighboring boids
+			if (distance < rule1Distance) {
+				center += pos_j;
+				++neighborCount1;
 			}
-			else {
-				// use shared memory
-				float distance = glm::length(localPos[jThreadIdx] - localPos[iThreadIdx]);
 
-				// Rule 1: Cohesion: boids fly towards the center of mass of neighboring boids
-				if (distance < rule1Distance) {
-					center += localPos[jThreadIdx];
-					++neighborCount1;
-				}
+			// Rule 2: Separation: boids try to keep a small distance away from each other
+			if (distance < rule2Distance) {
+				separate -= (pos_j - pos_i);
+			}
 
-				// Rule 2: Separation: boids try to keep a small distance away from each other
-				if (distance < rule2Distance) {
-					separate -= (localPos[jThreadIdx] - localPos[iThreadIdx]);
-				}
-
-				// Rule 3: Alignment: boids try to match the velocities of neighboring boids
-				if (distance < rule3Distance) {
-					cohesion += localVel[jThreadIdx];
-					++neighborCount3;
-				}
+			// Rule 3: Alignment: boids try to match the velocities of neighboring boids
+			if (distance < rule3Distance) {
+				cohesion += vel[j];
+				++neighborCount3;
 			}
 		}
 	}
@@ -590,7 +571,7 @@ __device__ glm::vec3 computeVelocityChangeNeighborCellsCoherentSharedMem(int N, 
 		center /= neighborCount1;
 		cohesion /= neighborCount3;
 
-		deltaVelocity += (center - localPos[iThreadIdx]) * rule1Scale;
+		deltaVelocity += (center - pos_i) * rule1Scale;
 		deltaVelocity += separate * rule2Scale;
 		deltaVelocity += cohesion * rule3Scale;
 	}
@@ -618,24 +599,11 @@ __global__ void kernUpdateVelNeighborSearchScattered(
 	}
 	// find the array index
 	int arrayIndex = particleArrayIndices[index];
-	// which is the grid index? in 3D
-	glm::vec3 posToGridMin = pos[arrayIndex] - gridMin;
-	glm::ivec3 gridIdx3D = glm::floor(posToGridMin * inverseCellWidth);
 	// find neighbor cells
+	glm::vec3 posToGridMin = pos[arrayIndex] - gridMin;
 	int neighborCells[8];
-	glm::vec3 minNeighborCellIdx3D, maxNeighborCellIdx3D;
-	glm::bvec3 greaterThanCenter = glm::greaterThanEqual(posToGridMin, 
-														 glm::vec3(gridIdx3D) * cellWidth + glm::vec3(0.5f * cellWidth));
-	for (int i = 0; i < 3; ++i) {
-		if (greaterThanCenter[i]) {
-			minNeighborCellIdx3D[i] = gridIdx3D[i];
-			maxNeighborCellIdx3D[i] = glm::min(gridResolution - 1, gridIdx3D[i] + 1);
-		}
-		else {
-			maxNeighborCellIdx3D[i] = gridIdx3D[i];
-			minNeighborCellIdx3D[i] = glm::max(0, gridIdx3D[i] - 1);
-		}
-	}
+	glm::vec3 minNeighborCellIdx3D = glm::floor((posToGridMin - 0.5f * cellWidth) * inverseCellWidth);
+	glm::vec3 maxNeighborCellIdx3D = glm::floor((posToGridMin + 0.5f * cellWidth) * inverseCellWidth);
 	int neighborCellCount = 0;
 	// should use z-y-x order
 	for (int k = minNeighborCellIdx3D[2]; k <= maxNeighborCellIdx3D[2]; ++k) {
@@ -675,24 +643,11 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
 	if (index >= N) {
 		return;
 	}
-	// which is the grid index? in 3D
-	glm::vec3 posToGridMin = pos[index] - gridMin;
-	glm::ivec3 gridIdx3D = glm::floor(posToGridMin * inverseCellWidth);
 	// find neighbor cells
+	glm::vec3 posToGridMin = pos[index] - gridMin;
 	int neighborCells[8];
-	glm::vec3 minNeighborCellIdx3D, maxNeighborCellIdx3D;
-	glm::bvec3 greaterThanCenter = glm::greaterThanEqual(posToGridMin,
-		glm::vec3(gridIdx3D) * cellWidth + glm::vec3(0.5f * cellWidth));
-	for (int i = 0; i < 3; ++i) {
-		if (greaterThanCenter[i]) {
-			minNeighborCellIdx3D[i] = gridIdx3D[i];
-			maxNeighborCellIdx3D[i] = glm::min(gridResolution - 1, gridIdx3D[i] + 1);
-		}
-		else {
-			maxNeighborCellIdx3D[i] = gridIdx3D[i];
-			minNeighborCellIdx3D[i] = glm::max(0, gridIdx3D[i] - 1);
-		}
-	}
+	glm::vec3 minNeighborCellIdx3D = glm::floor((posToGridMin - 0.5f * cellWidth) * inverseCellWidth);
+	glm::vec3 maxNeighborCellIdx3D = glm::floor((posToGridMin + 0.5f * cellWidth) * inverseCellWidth);
 	int neighborCellCount = 0;
 	// should use z-y-x order
 	for (int k = minNeighborCellIdx3D[2]; k <= maxNeighborCellIdx3D[2]; ++k) {
@@ -728,34 +683,18 @@ __global__ void kernUpdateVelNeighborSearchCoherentSharedMem(
 	// - Access each boid in the cell and compute velocity change from
 	//   the boids rules, if this boid is within the neighborhood distance.
 	// - Clamp the speed change before putting the new speed in vel2
+	__shared__ glm::vec3 localPos[blockSize];
+
 	int index = threadIdx.x + (blockIdx.x * blockDim.x);
 	if (index >= N) {
 		return;
 	}
-	// load pos and vel into local sharedmemory
-	__shared__ glm::vec3 localPos[blockSize];
-	__shared__ glm::vec3 localVel[blockSize];
-	localPos[threadIdx.x] = pos[index];
-	localVel[threadIdx.x] = vel1[index];
-	__syncthreads();
-	// which is the grid index? in 3D
-	glm::vec3 posToGridMin = localPos[threadIdx.x] - gridMin;
-	glm::ivec3 gridIdx3D = glm::floor(posToGridMin * inverseCellWidth);
+	glm::vec3 thispos = pos[index];
 	// find neighbor cells
+	glm::vec3 posToGridMin = thispos - gridMin;
 	int neighborCells[8];
-	glm::vec3 minNeighborCellIdx3D, maxNeighborCellIdx3D;
-	glm::bvec3 greaterThanCenter = glm::greaterThanEqual(posToGridMin,
-		glm::vec3(gridIdx3D) * cellWidth + glm::vec3(0.5f * cellWidth));
-	for (int i = 0; i < 3; ++i) {
-		if (greaterThanCenter[i]) {
-			minNeighborCellIdx3D[i] = gridIdx3D[i];
-			maxNeighborCellIdx3D[i] = glm::min(gridResolution - 1, gridIdx3D[i] + 1);
-		}
-		else {
-			maxNeighborCellIdx3D[i] = gridIdx3D[i];
-			minNeighborCellIdx3D[i] = glm::max(0, gridIdx3D[i] - 1);
-		}
-	}
+	glm::vec3 minNeighborCellIdx3D = glm::floor((posToGridMin - 0.5f * cellWidth) * inverseCellWidth);
+	glm::vec3 maxNeighborCellIdx3D = glm::floor((posToGridMin + 0.5f * cellWidth) * inverseCellWidth);
 	int neighborCellCount = 0;
 	// should use z-y-x order
 	for (int k = minNeighborCellIdx3D[2]; k <= maxNeighborCellIdx3D[2]; ++k) {
@@ -765,9 +704,13 @@ __global__ void kernUpdateVelNeighborSearchCoherentSharedMem(
 			}
 		}
 	}
+	// load pos into local sharedmemory
+	localPos[threadIdx.x] = thispos;
+	glm::vec3 thisvel = vel1[index];
+	__syncthreads();
 	// update velocity in neighbor cells
-	glm::vec3 newVel = localVel[threadIdx.x] + computeVelocityChangeNeighborCellsCoherentSharedMem(N, index, gridCellStartIndices, gridCellEndIndices,
-		neighborCells, neighborCellCount, pos, vel1, localPos, localVel);
+	glm::vec3 newVel = thisvel + computeVelocityChangeNeighborCellsCoherentSharedMem(N, index, gridCellStartIndices, gridCellEndIndices,
+		neighborCells, neighborCellCount, pos, vel1, localPos);
 	if (glm::length(newVel) > maxSpeed) {
 		newVel = glm::normalize(newVel) * maxSpeed;
 	}
@@ -779,7 +722,6 @@ __global__ void kernUpdateVelNeighborSearchCoherentSharedMem(
 */
 void Boids::stepSimulationNaive(float dt) {
 	// TODO-1.2 - use the kernels you wrote to step the simulation forward in time.
-	static int curVelBuffer = 0;
 	glm::vec3* prevBuffer = (curVelBuffer == 1) ? dev_vel2 : dev_vel1;
 	glm::vec3* curBuffer = (curVelBuffer == 1) ? dev_vel1 : dev_vel2;
 
@@ -795,7 +737,6 @@ void Boids::stepSimulationNaive(float dt) {
 void Boids::stepSimulationScatteredGrid(float dt) {
 	// TODO-2.1
 	// Uniform Grid Neighbor search using Thrust sort.
-	static int curVelBuffer = 0;
 	glm::vec3* prevBuffer = (curVelBuffer == 1) ? dev_vel2 : dev_vel1;
 	glm::vec3* curBuffer = (curVelBuffer == 1) ? dev_vel1 : dev_vel2;
 
@@ -827,7 +768,6 @@ void Boids::stepSimulationScatteredGrid(float dt) {
 void Boids::stepSimulationCoherentGrid(float dt) {
 	// TODO-2.3 - start by copying Boids::stepSimulationNaiveGrid
 	// Uniform Grid Neighbor search using Thrust sort on cell-coherent data.
-	static int curVelBuffer = 0;
 	glm::vec3* prevBuffer = (curVelBuffer == 1) ? dev_vel2 : dev_vel1;
 	glm::vec3* curBuffer = (curVelBuffer == 1) ? dev_vel1 : dev_vel2;
 
@@ -864,7 +804,6 @@ void Boids::stepSimulationCoherentGrid(float dt) {
 void Boids::stepSimulationCoherentGridSharedMem(float dt) {
 	// TODO-2.3 - start by copying Boids::stepSimulationNaiveGrid
 	// Uniform Grid Neighbor search using Thrust sort on cell-coherent data.
-	static int curVelBuffer = 0;
 	glm::vec3* prevBuffer = (curVelBuffer == 1) ? dev_vel2 : dev_vel1;
 	glm::vec3* curBuffer = (curVelBuffer == 1) ? dev_vel1 : dev_vel2;
 
