@@ -95,6 +95,8 @@ int *dev_gridCellEndIndices;   // to this cell?
 
 // TODO-2.3 - consider what additional buffers you might need to reshuffle
 // the position and velocity data to be coherent within cells.
+glm::vec3* dev_pos_coherent;
+glm::vec3* dev_vel_coherent;
 
 // LOOK-2.1 - Grid parameters based on simulation parameters.
 // These are automatically computed for you in Boids::initSimulation
@@ -193,6 +195,12 @@ void Boids::initSimulation(int N) {
 
   dev_thrust_particleArrayIndices = thrust::device_pointer_cast(dev_particleArrayIndices);
   dev_thrust_particleGridIndices = thrust::device_pointer_cast(dev_particleGridIndices);
+
+  cudaMalloc((void**)&dev_pos_coherent, N * sizeof(glm::vec3));
+  checkCUDAErrorWithLine("cudaMalloc dev_pos_coherent failed!");
+
+  cudaMalloc((void**)&dev_vel_coherent, N * sizeof(glm::vec3));
+  checkCUDAErrorWithLine("cudaMalloc dev_vel_coherent failed!");
 
   cudaDeviceSynchronize();
 }
@@ -540,6 +548,20 @@ __global__ void kernUpdateVelNeighborSearchScattered(
     vel2[index] = newVel;
 }
 
+__global__ void kernReshuffleDataCoherent(int N, int* particleArrayIndices,
+    glm::vec3* pos_scattered, glm::vec3* pos_coherent,
+    glm::vec3* vel_scattered, glm::vec3* vel_coherent) {
+	int index = threadIdx.x + (blockIdx.x * blockDim.x);
+    if (index >= N) {
+        return;
+	}
+
+	int originalIndex = particleArrayIndices[index];
+
+	pos_coherent[index] = pos_scattered[originalIndex];
+	vel_coherent[index] = vel_scattered[originalIndex];
+}
+
 __global__ void kernUpdateVelNeighborSearchCoherent(
   int N, int gridResolution, glm::vec3 gridMin,
   float inverseCellWidth, float cellWidth,
@@ -557,6 +579,99 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
   // - Access each boid in the cell and compute velocity change from
   //   the boids rules, if this boid is within the neighborhood distance.
   // - Clamp the speed change before putting the new speed in vel2
+    int index = threadIdx.x + (blockIdx.x * blockDim.x);
+    if (index >= N) {
+        return;
+    }
+
+    glm::vec3 thisPos = pos[index];
+    glm::vec3 thisVel = vel1[index];
+
+    glm::vec3 gridPos = (thisPos - gridMin) * inverseCellWidth;
+    int gridX = (int)floor(gridPos.x);
+    int gridY = (int)floor(gridPos.y);
+    int gridZ = (int)floor(gridPos.z);
+
+    gridX = imax(0, imin(gridX, gridResolution - 1));
+    gridY = imax(0, imin(gridY, gridResolution - 1));
+    gridZ = imax(0, imin(gridZ, gridResolution - 1));
+
+    glm::vec3 perceived_center(0.0f);
+    glm::vec3 c(0.0f);
+    glm::vec3 perceived_velocity(0.0f);
+    int neighborCount1 = 0;
+    int neighborCount3 = 0;
+
+    for (int offsetZ = -1; offsetZ <= 1; offsetZ++) {
+        for (int offsetY = -1; offsetY <= 1; offsetY++) {
+            for (int offsetX = -1; offsetX <= 1; offsetX++) {
+                int neighborX = gridX + offsetX;
+                int neighborY = gridY + offsetY;
+                int neighborZ = gridZ + offsetZ;
+
+                if (neighborX < 0 || neighborX >= gridResolution ||
+                    neighborY < 0 || neighborY >= gridResolution ||
+                    neighborZ < 0 || neighborZ >= gridResolution) {
+                    continue;
+                }
+
+                int neighborCellIndex = gridIndex3Dto1D(neighborX, neighborY, neighborZ, gridResolution);
+
+                int startIdx = gridCellStartIndices[neighborCellIndex];
+                int endIdx = gridCellEndIndices[neighborCellIndex];
+
+                for (int j = startIdx; j < endIdx; j++) {
+                    if (j == index) {
+                        continue;
+                    }
+
+                    glm::vec3 otherPos = pos[j];
+                    glm::vec3 otherVel = vel1[j];
+
+                    float distance = glm::distance(thisPos, otherPos);
+
+                    // Rule 1: Cohesion
+                    if (distance < rule1Distance) {
+                        perceived_center += otherPos;
+                        neighborCount1++;
+                    }
+
+                    // Rule 2: Separation
+                    if (distance < rule2Distance) {
+                        c -= (otherPos - thisPos);
+                    }
+
+                    // Rule 3: Alignment
+                    if (distance < rule3Distance) {
+                        perceived_velocity += otherVel;
+                        neighborCount3++;
+                    }
+                }
+            }
+        }
+    }
+
+    glm::vec3 velocity(0.0f);
+
+    if (neighborCount1 > 0) {
+        perceived_center /= (float)neighborCount1;
+        velocity += (perceived_center - thisPos) * rule1Scale;
+    }
+
+    velocity += c * rule2Scale;
+
+    if (neighborCount3 > 0) {
+        perceived_velocity /= (float)neighborCount3;
+        velocity += perceived_velocity * rule3Scale;
+    }
+
+    glm::vec3 newVel = thisVel + velocity;
+
+    if (glm::length(newVel) > maxSpeed) {
+        newVel = glm::normalize(newVel) * maxSpeed;
+    }
+
+    vel2[index] = newVel;
 }
 
 /**
@@ -592,7 +707,7 @@ void Boids::stepSimulationScatteredGrid(float dt) {
     dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
     dim3 fullBlocksPerGridCells((gridCellCount + blockSize - 1) / blockSize);
 
-    kernComputeIndices << <fullBlocksPerGrid, blockSize >> > (
+    kernComputeIndices<<<fullBlocksPerGrid, blockSize>>> (
         numObjects, gridSideCount, gridMinimum, gridInverseCellWidth,
         dev_pos, dev_particleArrayIndices, dev_particleGridIndices);
     checkCUDAErrorWithLine("kernComputeIndices failed!");
@@ -601,18 +716,18 @@ void Boids::stepSimulationScatteredGrid(float dt) {
         dev_thrust_particleGridIndices + numObjects,
         dev_thrust_particleArrayIndices);
 
-    kernResetIntBuffer << <fullBlocksPerGridCells, blockSize >> > (
+    kernResetIntBuffer<<<fullBlocksPerGridCells, blockSize>>> (
         gridCellCount, dev_gridCellStartIndices, -1);
-    kernResetIntBuffer << <fullBlocksPerGridCells, blockSize >> > (
+    kernResetIntBuffer<<<fullBlocksPerGridCells, blockSize>>> (
         gridCellCount, dev_gridCellEndIndices, -1);
     checkCUDAErrorWithLine("kernResetIntBuffer failed!");
 
-    kernIdentifyCellStartEnd << <fullBlocksPerGrid, blockSize >> > (
+    kernIdentifyCellStartEnd<<<fullBlocksPerGrid, blockSize>>> (
         numObjects, dev_particleGridIndices,
         dev_gridCellStartIndices, dev_gridCellEndIndices);
     checkCUDAErrorWithLine("kernIdentifyCellStartEnd failed!");
 
-    kernUpdateVelNeighborSearchScattered << <fullBlocksPerGrid, blockSize >> > (
+    kernUpdateVelNeighborSearchScattered<<<fullBlocksPerGrid, blockSize>>> (
         numObjects, gridSideCount, gridMinimum,
         gridInverseCellWidth, gridCellWidth,
         dev_gridCellStartIndices, dev_gridCellEndIndices,
@@ -620,7 +735,7 @@ void Boids::stepSimulationScatteredGrid(float dt) {
         dev_pos, dev_vel1, dev_vel2);
     checkCUDAErrorWithLine("kernUpdateVelNeighborSearchScattered failed!");
 
-    kernUpdatePos << <fullBlocksPerGrid, blockSize >> > (
+    kernUpdatePos<<<fullBlocksPerGrid, blockSize>>> (
         numObjects, dt, dev_pos, dev_vel2);
     checkCUDAErrorWithLine("kernUpdatePos failed!");
 
@@ -645,6 +760,66 @@ void Boids::stepSimulationCoherentGrid(float dt) {
   // - Perform velocity updates using neighbor search
   // - Update positions
   // - Ping-pong buffers as needed. THIS MAY BE DIFFERENT FROM BEFORE.
+    dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
+    dim3 fullBlocksPerGridCells((gridCellCount + blockSize - 1) / blockSize);
+
+    // Step 1: Label each particle with its array index and grid index
+    kernComputeIndices<<<fullBlocksPerGrid, blockSize>>> (
+        numObjects, gridSideCount, gridMinimum, gridInverseCellWidth,
+        dev_pos, dev_particleArrayIndices, dev_particleGridIndices);
+    checkCUDAErrorWithLine("kernComputeIndices failed!");
+
+    // Step 2: Sort particles by grid index using Thrust
+    thrust::sort_by_key(dev_thrust_particleGridIndices,
+        dev_thrust_particleGridIndices + numObjects,
+        dev_thrust_particleArrayIndices);
+
+    // Step 3: Reset the grid cell start/end buffers
+    kernResetIntBuffer<<<fullBlocksPerGridCells, blockSize>>> (
+        gridCellCount, dev_gridCellStartIndices, -1);
+    kernResetIntBuffer<<<fullBlocksPerGridCells, blockSize>>> (
+        gridCellCount, dev_gridCellEndIndices, -1);
+    checkCUDAErrorWithLine("kernResetIntBuffer failed!");
+
+    // Step 4: Identify cell start and end indices
+    kernIdentifyCellStartEnd<<<fullBlocksPerGrid, blockSize>>> (
+        numObjects, dev_particleGridIndices,
+        dev_gridCellStartIndices, dev_gridCellEndIndices);
+    checkCUDAErrorWithLine("kernIdentifyCellStartEnd failed!");
+
+    // Step 5: Reshuffle the particle data to be coherent
+    kernReshuffleDataCoherent<<<fullBlocksPerGrid, blockSize>>> (
+        numObjects, dev_particleArrayIndices,
+        dev_pos, dev_pos_coherent,
+        dev_vel1, dev_vel_coherent);
+    checkCUDAErrorWithLine("kernReshuffleDataCoherent failed!");
+
+    // Step 6: Update velocities using neighbor search on coherent data
+    // Note: vel2 will contain the new velocities in coherent order
+    kernUpdateVelNeighborSearchCoherent<<<fullBlocksPerGrid, blockSize>>> (
+        numObjects, gridSideCount, gridMinimum,
+        gridInverseCellWidth, gridCellWidth,
+        dev_gridCellStartIndices, dev_gridCellEndIndices,
+        dev_pos_coherent, dev_vel_coherent, dev_vel2);
+    checkCUDAErrorWithLine("kernUpdateVelNeighborSearchCoherent failed!");
+
+    // Step 7: Update positions using coherent velocities
+    // Note: This updates dev_pos_coherent, not dev_pos
+    kernUpdatePos<<<fullBlocksPerGrid, blockSize>>> (
+        numObjects, dt, dev_pos_coherent, dev_vel2);
+    checkCUDAErrorWithLine("kernUpdatePos failed!");
+
+    // Step 8: Ping-pong buffers
+    // IMPORTANT: We need to swap the coherent position back to dev_pos
+    // and the new velocities (dev_vel2) to dev_vel1 for the next iteration
+    glm::vec3* temp = dev_pos;
+    dev_pos = dev_pos_coherent;
+    dev_pos_coherent = temp;
+
+    temp = dev_vel1;
+    dev_vel1 = dev_vel2;
+    dev_vel2 = temp;
+    
 }
 
 void Boids::endSimulation() {
@@ -657,6 +832,8 @@ void Boids::endSimulation() {
   cudaFree(dev_particleGridIndices);
   cudaFree(dev_gridCellStartIndices);
   cudaFree(dev_gridCellEndIndices);
+  cudaFree(dev_pos_coherent);
+  cudaFree(dev_vel_coherent);
 }
 
 void Boids::unitTest() {
