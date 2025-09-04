@@ -7,6 +7,7 @@ Project 1 - Flocking**
 
 ### Results
  ![](gif.gif)
+ 
  This gif was recorded on the machine described above with 50000 boids and a timestep of 0.02 to make the animation smooth.
  It uses the Coherent Grid algorithm, which provides the fastest results by sorting boid positions and velocities by grid cell index,
  making the lookup of boids in a grid cell much faster than the Uniform Grid algorithm, which does not make this optimization.
@@ -21,8 +22,10 @@ Project 1 - Flocking**
  The naive method also can not handle more than 100k boids on my laptop, which is why its data points end there.
  The block size was 128 for these plots and the data was visualized. For different block size comparisons and non-visualization performance
  comparisons, please see the graphs further down.
+ 
   ![](plotVis.png)
   ![](plotLogVis.png)
+  
  As we can clearly see, the naive implementation is by far the worst; optimizing neighboring cell searches provides a significant boost in
  performance; and the Coherent Grid algorithm is faster than the Uniform Grid one. However, the difference between Uniform and Coherent grids
  is quite small when dealing with a small number of boids, and Uniform is actually faster when searching all the neighbors. Furthermore,
@@ -35,13 +38,18 @@ Project 1 - Flocking**
  in each cell. This means that each thread will have to generally check the same number of boids, and thus they rarely stall. However, with 100k, we
  we still have some sparse areas which lead to some threads having much more work than others, creating some massive stalling. We can see these
  boid values in the image below:
+ 
   ![](combined.png)
+  
   When comparing between visualizing VS not visualizing, we see the expected result that not rendering the visuals speeds up the simulation.
   This is consistent accross the non-naive implementations and is about a factor of 2. For the naive implementation, the difference is quite
   minimal, since the algorithm is throttled by other problems, to the point where visualizing came out faster for 10k boids.
+  
   ![](plotNoVis.png)
+  
   When comparing block size, the performance stays consistent. I was curious about why this was the case and checked in Nsight. I found that
   my bottlenecks were glClear and swapping buffers, which are not affected by block size changes, so this lack of perfomance change is expected.
+  
   ![](plotBlocks.png)
   ![](profiler.png)
  
