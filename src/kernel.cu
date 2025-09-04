@@ -444,7 +444,7 @@ __global__ void kernUpdateVelNeighborSearchScattered(
     int tIdx = (blockIdx.x * blockDim.x) + threadIdx.x;
     if (tIdx >= N) return;
     int currBoid = particleArrayIndices[tIdx];
-    glm::ivec3 relativePos = glm::ivec3((pos[currBoid] - gridMin) * inverseCellWidth);
+    glm::vec3 relativePos = glm::vec3((pos[currBoid] - gridMin) * inverseCellWidth);
   // - Identify which cells may contain neighbors. This isn't always 8.
 
     // vars for the rules
@@ -454,12 +454,12 @@ __global__ void kernUpdateVelNeighborSearchScattered(
 
     float cellOffset = maxRuleDist * inverseCellWidth;
 
-    int minX = imax(relativePos.x - cellOffset, 0);
-    int minY = imax(relativePos.y - cellOffset, 0);
-    int minZ = imax(relativePos.z - cellOffset, 0);
-    int maxX = imin(relativePos.x + cellOffset, gridResolution - 1);
-    int maxY = imin(relativePos.y + cellOffset, gridResolution - 1);
-    int maxZ = imin(relativePos.z + cellOffset, gridResolution - 1);
+    int minX = imax((int)relativePos.x - cellOffset, 0);
+    int minY = imax((int)relativePos.y - cellOffset, 0);
+    int minZ = imax((int)relativePos.z - cellOffset, 0);
+    int maxX = imin((int)relativePos.x + cellOffset, gridResolution - 1);
+    int maxY = imin((int)relativePos.y + cellOffset, gridResolution - 1);
+    int maxZ = imin((int)relativePos.z + cellOffset, gridResolution - 1);
 
     for (int z = minZ; z <= maxZ; ++z)
     {
@@ -530,7 +530,7 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
   // - Identify the grid cell that this particle is in
     int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
     if (idx >= N) return;
-    glm::ivec3 relativePos = glm::ivec3((pos[idx] - gridMin) * inverseCellWidth);
+    glm::vec3 relativePos = glm::vec3((pos[idx] - gridMin) * inverseCellWidth);
   // - Identify which cells may contain neighbors. This isn't always 8.
     // vars for the rules
     int numNeighbors1 = 0;      // different neighbor sum for rules 1 and 3 in case their neighbor dist is different
@@ -539,12 +539,12 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
 
     float cellOffset = maxRuleDist * inverseCellWidth;
 
-    int minX = imax(relativePos.x - cellOffset, 0);
-    int minY = imax(relativePos.y - cellOffset, 0);
-    int minZ = imax(relativePos.z - cellOffset, 0);
-    int maxX = imin(relativePos.x + cellOffset, gridResolution - 1);
-    int maxY = imin(relativePos.y + cellOffset, gridResolution - 1);
-    int maxZ = imin(relativePos.z + cellOffset, gridResolution - 1);
+    int minX = imax((int)relativePos.x - cellOffset, 0);
+    int minY = imax((int)relativePos.y - cellOffset, 0);
+    int minZ = imax((int)relativePos.z - cellOffset, 0);
+    int maxX = imin((int)relativePos.x + cellOffset, gridResolution - 1);
+    int maxY = imin((int)relativePos.y + cellOffset, gridResolution - 1);
+    int maxZ = imin((int)relativePos.z + cellOffset, gridResolution - 1);
     for (int z = minZ; z <= maxZ; ++z)
     {
         for (int y = minY; y <= maxY; ++y)
