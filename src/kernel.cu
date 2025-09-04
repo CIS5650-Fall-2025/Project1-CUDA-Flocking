@@ -47,7 +47,14 @@ void checkCUDAError(const char *msg, int line = -1) {
 *****************/
 
 /*! Block size used for CUDA kernel launch. */
+//#define blockSize 32
+//#define blockSize 64
 #define blockSize 128
+//#define blockSize 192
+//#define blockSize 256
+//#define blockSize 512
+//#define blockSize 1024
+//default was 128
 
 // LOOK-1.2 Parameters for the boids algorithm.
 // These worked well in our reference implementation.
@@ -69,7 +76,7 @@ void checkCUDAError(const char *msg, int line = -1) {
 
 // 2.2 alternate neighborhood distance
 // seems to perform much worse for me
-#define useShortNeighborHoodDistance 0
+#define useShortNeighborHoodDistance 1
 
 /***********************************************
 * Kernel state (pointers are device pointers) *
@@ -432,14 +439,14 @@ __global__ void kernUpdateVelNeighborSearchScattered(
     glm::ivec3 cellPos = glm::ivec3((pos[index] - gridMin) * inverseCellWidth); // TODO make sure offset right (want to step over to be centered on nearest corner of cell)
   // - Identify which cells may contain neighbors. This isn't always 8.
     glm::ivec3 minCell = glm::max(cellPos - 1, 0);
-    glm::ivec3 maxCell = glm::min(cellPos + 1, N - 1); // TODO make sure max/min works for this
+    glm::ivec3 maxCell = glm::min(cellPos + 1, gridResolution - 1); // TODO make sure max/min works for this
     // TODO might be better to convert to 1d first and add/subtract offsets? though then I guess need ifs for edges
     
 #else
     glm::ivec3 cellPos = glm::ivec3((pos[index] - gridMin) * inverseCellWidth + 0.5f); // TODO make sure offset right (want to step over to be centered on nearest corner of cell)
   // - Identify which cells may contain neighbors. This isn't always 8.
     glm::ivec3 minCell = glm::max(cellPos - 1, 0);
-    glm::ivec3 maxCell = glm::min(cellPos, N - 1); // TODO make sure max/min works for this
+    glm::ivec3 maxCell = glm::min(cellPos, gridResolution - 1); // TODO make sure max/min works for this
     // TODO might be better to convert to 1d first and add/subtract offsets? though then I guess need ifs for edges
 #endif
   // - For each cell, read the start/end indices in the boid pointer array.
@@ -535,14 +542,14 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
     glm::ivec3 cellPos = glm::ivec3((pos[index] - gridMin) * inverseCellWidth); // TODO make sure offset right (want to step over to be centered on nearest corner of cell)
     // - Identify which cells may contain neighbors. This isn't always 8.
     glm::ivec3 minCell = glm::max(cellPos - 1, 0);
-    glm::ivec3 maxCell = glm::min(cellPos + 1, N - 1); // TODO make sure max/min works for this
+    glm::ivec3 maxCell = glm::min(cellPos + 1, gridResolution - 1); // TODO make sure max/min works for this
     // TODO might be better to convert to 1d first and add/subtract offsets? though then I guess need ifs for edges
 
 #else
     glm::ivec3 cellPos = glm::ivec3((pos[index] - gridMin) * inverseCellWidth + 0.5f); // TODO make sure offset right (want to step over to be centered on nearest corner of cell)
     // - Identify which cells may contain neighbors. This isn't always 8.
     glm::ivec3 minCell = glm::max(cellPos - 1, 0);
-    glm::ivec3 maxCell = glm::min(cellPos, N - 1); // TODO make sure max/min works for this
+    glm::ivec3 maxCell = glm::min(cellPos, gridResolution - 1); // TODO make sure max/min works for this
     // TODO might be better to convert to 1d first and add/subtract offsets? though then I guess need ifs for edges
 #endif
   // - For each cell, read the start/end indices in the boid pointer array.

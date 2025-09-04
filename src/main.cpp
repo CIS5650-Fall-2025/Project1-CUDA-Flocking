@@ -22,24 +22,26 @@
 // ================
 
 // LOOK-2.1 LOOK-2.3 - toggles for UNIFORM_GRID and COHERENT_GRID
-#define VISUALIZE 0
-#define UNIFORM_GRID 0
-#define COHERENT_GRID 0
+#define VISUALIZE 1
+#define UNIFORM_GRID 1
+#define COHERENT_GRID 1
 
 
-#define TRACK_EVENTS 1
+#define TRACK_EVENTS 0
 #if TRACK_EVENTS
 int frameCount = 0;
 float frameSum = 0.f;
 const int frameSpan = 1000;
+//const int frameSpan = 100;
 //const int frameSpan = 20;
 #endif
 
 // LOOK-1.2 - change this to adjust particle count in the simulation
 //base code: const int N_FOR_VIS = 5000;
 //const int N_FOR_VIS = 50000000;
-//const int N_FOR_VIS = 500000;
-const int N_FOR_VIS = 500000;
+const int N_FOR_VIS = 5000;
+//const int N_FOR_VIS = 50000000;
+//const int N_FOR_VIS = 1000000;
 const float DT = 0.2f;
 
 /**
@@ -288,10 +290,12 @@ void initShaders(GLuint * program) {
                        // your CUDA development setup is ready to go.
     
     //info for data output headings
+#if TRACK_EVENTS
     std::cout << "Visualize,Mode,Boid Count," 
         << "Block Count,Block Size,Scene Scale,"
         << "Cell Width Type,Cell Width,Cell Side Count,Cell Count,"
         << "Frame Span,Start Frame,End Frame,Total Time (ms),Total Time (s),Per-Frame Time (ms),FPS (Simulation only)" << std::endl;
+#endif
 
     while (!glfwWindowShouldClose(window)) {
       glfwPollEvents();
