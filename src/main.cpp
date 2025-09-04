@@ -31,16 +31,17 @@
 #if TRACK_EVENTS
 int frameCount = 0;
 float frameSum = 0.f;
-const int frameSpan = 1000;
-//const int frameSpan = 100;
+//const int frameSpan = 1000;
+const int frameSpan = 100;
 //const int frameSpan = 20;
 #endif
 
 // LOOK-1.2 - change this to adjust particle count in the simulation
 //base code: const int N_FOR_VIS = 5000;
-//const int N_FOR_VIS = 50000000;
-const int N_FOR_VIS = 5000;
-//const int N_FOR_VIS = 50000000;
+const int N_FOR_VIS = 5000000;
+//const int N_FOR_VIS = 100000;
+//const int N_FOR_VIS = 500000;
+//const int N_FOR_VIS = 5000;
 //const int N_FOR_VIS = 1000000;
 const float DT = 0.2f;
 
