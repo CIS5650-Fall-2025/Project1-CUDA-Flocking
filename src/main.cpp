@@ -22,13 +22,24 @@
 // ================
 
 // LOOK-2.1 LOOK-2.3 - toggles for UNIFORM_GRID and COHERENT_GRID
-#define VISUALIZE 1
-#define UNIFORM_GRID 1
-#define COHERENT_GRID 1
+#define VISUALIZE 0
+#define UNIFORM_GRID 0
+#define COHERENT_GRID 0
+
+
+#define TRACK_EVENTS 1
+#if TRACK_EVENTS
+int frameCount = 0;
+float frameSum = 0.f;
+const int frameSpan = 1000;
+//const int frameSpan = 20;
+#endif
 
 // LOOK-1.2 - change this to adjust particle count in the simulation
 //base code: const int N_FOR_VIS = 5000;
-const int N_FOR_VIS = 5000000;
+//const int N_FOR_VIS = 50000000;
+//const int N_FOR_VIS = 500000;
+const int N_FOR_VIS = 500000;
 const float DT = 0.2f;
 
 /**
@@ -205,6 +216,15 @@ void initShaders(GLuint * program) {
     cudaGLMapBufferObject((void**)&dptrVertPositions, boidVBO_positions);
     cudaGLMapBufferObject((void**)&dptrVertVelocities, boidVBO_velocities);
 
+#if TRACK_EVENTS
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+
+    cudaEventRecord(start);
+#endif
+
+
     // execute the kernel
     #if UNIFORM_GRID && COHERENT_GRID
     Boids::stepSimulationCoherentGrid(DT);
@@ -213,6 +233,43 @@ void initShaders(GLuint * program) {
     #else
     Boids::stepSimulationNaive(DT);
     #endif
+
+#if TRACK_EVENTS
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    float milliseconds = 0;
+    cudaEventElapsedTime(&milliseconds, start, stop);
+
+    ++frameCount;
+    frameSum += milliseconds;
+    if (frameCount % frameSpan == 0) {
+        //std::cout << frameCount << ": " << milliseconds << std::endl;
+        //std::cout << frameCount - frameSpan << "-" << frameCount << "\t" << frameSum << "ms" << std::endl;
+
+
+
+#if VISUALIZE
+        std::cout << "On,";
+#else
+        std::cout << "Off,";
+#endif
+#if UNIFORM_GRID && COHERENT_GRID
+        std::cout << "Coherent,";
+#elif UNIFORM_GRID
+        std::cout << "Uniform,";
+#else
+        std::cout << "Naive,";
+#endif
+        std::cout << N_FOR_VIS << ",";
+        //std::cout << scene_scale << ",";
+        Boids::printStats(N_FOR_VIS);
+        std::cout << frameSpan << ",";
+        std::cout << frameCount - frameSpan << "," << frameCount << "," << frameSum << "," << frameSum / 1000.f << "," << frameSum / frameSpan << ",";
+        std::cout << 1 / (frameSum / frameSpan / 1000.f) << std::endl;
+
+        frameSum = 0.f;
+    }
+#endif
 
     #if VISUALIZE
     Boids::copyBoidsToVBO(dptrVertPositions, dptrVertVelocities);
@@ -229,6 +286,12 @@ void initShaders(GLuint * program) {
 
     Boids::unitTest(); // LOOK-1.2 We run some basic example code to make sure
                        // your CUDA development setup is ready to go.
+    
+    //info for data output headings
+    std::cout << "Visualize,Mode,Boid Count," 
+        << "Block Count,Block Size,Scene Scale,"
+        << "Cell Width Type,Cell Width,Cell Side Count,Cell Count,"
+        << "Frame Span,Start Frame,End Frame,Total Time (ms),Total Time (s),Per-Frame Time (ms),FPS (Simulation only)" << std::endl;
 
     while (!glfwWindowShouldClose(window)) {
       glfwPollEvents();

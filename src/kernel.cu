@@ -62,7 +62,8 @@ void checkCUDAError(const char *msg, int line = -1) {
 #define maxSpeed 1.0f
 
 /*! Size of the starting area in simulation space. */
-#define scene_scale 500.0f
+#define scene_scale 100.0f
+//#define scene_scale 500.0f
 // default 100.0f
 
 
@@ -404,7 +405,10 @@ __global__ void kernIdentifyCellStartEnd(int N, int *particleGridIndices,
     //if (index == 0) {
     //    gridCellStartIndices[particleGridIndices[index]] = index;
     //}
+    //int i0 = particleGridIndices[index];
+    //int i1 = particleGridIndices[index + 1];
     // TODO should this store value rather than access via array twice? does that affect performance either well or poorly? I assume negligible in this case
+    //  changing to store seemed to give slightly lower fps in a rough test but might just be variance from some other factor when I re-ran it
     if (particleGridIndices[index] != particleGridIndices[index + 1]) {
         gridCellStartIndices[particleGridIndices[index + 1]] = index + 1;
         gridCellEndIndices[particleGridIndices[index]] = index;
@@ -491,7 +495,7 @@ __global__ void kernUpdateVelNeighborSearchScattered(
     if (neighbors3 > 0) {
         perceivedVelocity /= neighbors3;
         resultVel += perceivedVelocity * rule3Scale; //TODO maybe swap to other version
-        //resultVel += (perceivedVelocity - vel[iSelf]) * rule3Scale; //form from Conrad Parker's notes
+        //resultVel += (perceivedVelocity - vel1[index]) * rule3Scale; //form from Conrad Parker's notes
     }
 
   // - Clamp the speed change before putting the new speed in vel2
@@ -791,4 +795,15 @@ void Boids::unitTest() {
   cudaFree(dev_intValues);
   checkCUDAErrorWithLine("cudaFree failed!");
   return;
+}
+
+void Boids::printStats(int N)
+{
+
+    dim3 fullBlocksPerGrid((N + blockSize - 1) / blockSize);
+
+    std::cout << fullBlocksPerGrid.x << ",";
+    std::cout << blockSize << "," << scene_scale << ",";
+    std::cout << (useShortNeighborHoodDistance ? "Neighborhood distance (27-cell)" : "Twice neighborhood distance (8-cell)") << ",";
+    std::cout << gridCellWidth << ","  << gridSideCount << "," << gridCellCount << ",";
 }
