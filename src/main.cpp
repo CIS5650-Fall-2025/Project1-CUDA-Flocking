@@ -27,14 +27,14 @@
 #define COHERENT_GRID 1
 
 // LOOK-1.2 - change this to adjust particle count in the simulation
-const int N_FOR_VIS = 5000;
+const int N_FOR_VIS = 100000;
 const float DT = 0.2f;
 
 /**
 * C main function.
 */
 int main(int argc, char* argv[]) {
-  projectName = "5650 CUDA Intro: Boids";
+  projectName = "Ruben Young";
 
   if (init(argc, argv)) {
     mainLoop();
