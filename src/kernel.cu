@@ -242,34 +242,58 @@ void Boids::copyBoidsToVBO(float *vbodptr_positions, float *vbodptr_velocities) 
 __device__ glm::vec3 computeVelocityChange(int N, int iSelf, const glm::vec3 *pos, const glm::vec3 *vel) {
   // Rule 1: boids fly towards their local perceived center of mass, which excludes themselves
     glm::vec3 posSelf = pos[iSelf]; 
-    glm::vec3 posOther; 
-    glm::vec3 pCenter; 
-    glm::vec3 v1; 
-    unsigned count = 0; 
+    glm::vec3 posOther(0.f); 
+    glm::vec3 velSelf = vel[iSelf]; 
+    glm::vec3 velOther(0.f); 
+
+    unsigned rule1Count = 0;
+    glm::vec3 pCenter(0.f); 
+    unsigned rule3Count = 0; 
+    glm::vec3 pVelocity(0.f); 
+
+    glm::vec3 v1(0.f), v2(0.f), v3(0.f);
     for (int i = 0; i < N; ++i) {
         if (i == iSelf) {
             continue; 
         }
         
         posOther = pos[i]; 
-        float dist = glm::distance(posSelf, pos[i]); 
-        if (dist < rule1Distance) {
-            pCenter += posOther;
-            ++count;
-        }
+        velOther = vel[i]; 
+        glm::vec3 d = posOther - posSelf; 
+        const float dist2 = glm::dot(d, d);
 
+        // rule 1
+        if (dist2 < rule1Distance * rule1Distance) {
+            pCenter += posOther;
+            ++rule1Count;
+        }
+        
+        // rule 2
+        if (dist2 < rule2Distance * rule2Distance) {
+            v2 -= (posOther - posSelf);
+        }        
+        
+        // rule 3 
+        if (dist2 < rule3Distance * rule3Distance) {
+            pVelocity += velOther; 
+            ++rule3Count;
+        }
     }
     
-    if (count != 0) {
-        pCenter = pCenter / glm::vec3(count);
+    // rule 1
+    if (rule1Count != 0) {
+        pCenter /= glm::vec3(rule1Count);
         v1 = (pCenter - posSelf) * rule1Scale;
     }
 
-  // Rule 2: boids try to stay a distance d away from each other
-    glm::vec3 v2; 
-  // Rule 3: boids try to match the speed of surrounding boids
-    glm::vec3 v3; 
-  return v1;
+    v2 *= rule2Scale;
+
+    // rule 3 
+    if (rule3Count != 0) {
+        v3 = (pVelocity / glm::vec3(rule3Count)) * rule3Scale;
+    }
+
+    return v1 + v2 + v3;
 }
 
 /**
