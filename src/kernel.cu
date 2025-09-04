@@ -170,6 +170,7 @@ void Boids::initSimulation(int N) {
 
   // LOOK-2.1 computing grid params
   gridCellWidth = 2.0f * std::max(std::max(rule1Distance, rule2Distance), rule3Distance);
+  gridCellWidth = std::max(std::max(rule1Distance, rule2Distance), rule3Distance);
   int halfSideCount = (int)(scene_scale / gridCellWidth) + 1;
   gridSideCount = 2 * halfSideCount;
 
@@ -467,66 +468,116 @@ __global__ void kernUpdateVelNeighborSearchScattered(
     cy = imax(0, imin(gridResolution - 1, cy));
     cz = imax(0, imin(gridResolution - 1, cz));
 
-    float fx = cx_f - floorf(cx_f);
-    float fy = cy_f - floorf(cy_f);
-    float fz = cz_f - floorf(cz_f);
-
-    int sx = (fx < 0.5f) ? -1 : 1;
-    int sy = (fy < 0.5f) ? -1 : 1;
-    int sz = (fz < 0.5f) ? -1 : 1;
 
     glm::vec3 perceived_center(0.0f, 0.0f, 0.0f);
 	glm::vec3 c(0.0f, 0.0f, 0.0f);
 	glm::vec3 perceived_velocity(0.0f, 0.0f, 0.0f);
 	int n1 = 0, n3 = 0;
 
-	int offsetX[2] = { 0, sx };
-	int offsetY[2] = { 0, sy };
-	int offsetZ[2] = { 0, sz };
+    const float R = imax(imax(rule1Distance, rule2Distance), rule3Distance);
+    if (cellWidth >= 2 * R) {
 
-    for (int i = 0; i < 2; i++) {
-        int nx = cx + offsetX[i];
-        if (nx < 0 || nx >= gridResolution) {
-            continue;
-        }
-        for (int j = 0; j < 2; j++) {
-            int ny = cy + offsetY[j];
-            if (ny < 0 || ny >= gridResolution) {
+        float fx = cx_f - floorf(cx_f);
+        float fy = cy_f - floorf(cy_f);
+        float fz = cz_f - floorf(cz_f);
+
+        int sx = (fx < 0.5f) ? -1 : 1;
+        int sy = (fy < 0.5f) ? -1 : 1;
+        int sz = (fz < 0.5f) ? -1 : 1;
+
+        int offsetX[2] = { 0, sx };
+        int offsetY[2] = { 0, sy };
+        int offsetZ[2] = { 0, sz };
+
+        for (int i = 0; i < 2; i++) {
+            int nx = cx + offsetX[i];
+            if (nx < 0 || nx >= gridResolution) {
                 continue;
             }
-            for (int k = 0; k < 2; k++) {
-                int nz = cz + offsetZ[k];
-                if (nz < 0 || nz >= gridResolution) {
+            for (int j = 0; j < 2; j++) {
+                int ny = cy + offsetY[j];
+                if (ny < 0 || ny >= gridResolution) {
                     continue;
                 }
-                int cellId = gridIndex3Dto1D(nx, ny, nz, gridResolution);
-                int startIdx = gridCellStartIndices[cellId];
-                int endIdx = gridCellEndIndices[cellId];
-                if (startIdx == -1 || endIdx == -1) {
-                    continue;
-                }
-                for (int idx = startIdx; idx <= endIdx; idx++) {
-                    int boidIndex = particleArrayIndices[idx];
-                    if (boidIndex == index) {
+                for (int k = 0; k < 2; k++) {
+                    int nz = cz + offsetZ[k];
+                    if (nz < 0 || nz >= gridResolution) {
                         continue;
                     }
-                    glm::vec3 otherPos = pos[boidIndex];
-                    float distance = glm::length(otherPos - p);
-                    if (distance < rule1Distance) {
-                        perceived_center += otherPos;
-                        n1++;
+                    int cellId = gridIndex3Dto1D(nx, ny, nz, gridResolution);
+                    int startIdx = gridCellStartIndices[cellId];
+                    int endIdx = gridCellEndIndices[cellId];
+                    if (startIdx == -1 || endIdx == -1) {
+                        continue;
                     }
-                    if (distance < rule2Distance) {
-                        c -= (otherPos - p);
-                    }
-                    if (distance < rule3Distance) {
-                        perceived_velocity += vel1[boidIndex];
-                        n3++;
+                    for (int idx = startIdx; idx <= endIdx; idx++) {
+                        int boidIndex = particleArrayIndices[idx];
+                        if (boidIndex == index) {
+                            continue;
+                        }
+                        glm::vec3 otherPos = pos[boidIndex];
+                        float distance = glm::length(otherPos - p);
+                        if (distance < rule1Distance) {
+                            perceived_center += otherPos;
+                            n1++;
+                        }
+                        if (distance < rule2Distance) {
+                            c -= (otherPos - p);
+                        }
+                        if (distance < rule3Distance) {
+                            perceived_velocity += vel1[boidIndex];
+                            n3++;
+                        }
                     }
                 }
             }
         }
-	}
+    }
+    else {
+        for (int i = -1; i < 2; i++) {
+            int nx = cx + i;
+            if (nx < 0 || nx >= gridResolution) {
+                continue;
+            }
+            for (int j = -1; j < 2; j++) {
+                int ny = cy + j;
+                if (ny < 0 || ny >= gridResolution) {
+                    continue;
+                }
+                for (int k = -1; k < 2; k++) {
+                    int nz = cz + k;
+                    if (nz < 0 || nz >= gridResolution) {
+                        continue;
+                    }
+                    int cellId = gridIndex3Dto1D(nx, ny, nz, gridResolution);
+                    int startIdx = gridCellStartIndices[cellId];
+                    int endIdx = gridCellEndIndices[cellId];
+                    if (startIdx == -1 || endIdx == -1) {
+                        continue;
+                    }
+                    for (int idx = startIdx; idx <= endIdx; idx++) {
+                        int boidIndex = particleArrayIndices[idx];
+                        if (boidIndex == index) {
+                            continue;
+                        }
+                        glm::vec3 otherPos = pos[boidIndex];
+                        float distance = glm::length(otherPos - p);
+                        if (distance < rule1Distance) {
+                            perceived_center += otherPos;
+                            n1++;
+                        }
+                        if (distance < rule2Distance) {
+                            c -= (otherPos - p);
+                        }
+                        if (distance < rule3Distance) {
+                            perceived_velocity += vel1[boidIndex];
+                            n3++;
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     if (n1 > 0) {
         perceived_center /= (float)n1;
@@ -595,58 +646,109 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
 	cx = imax(0, imin(gridResolution - 1, cx));
     cy = imax(0, imin(gridResolution - 1, cy));
     cz = imax(0, imin(gridResolution - 1, cz));
-    float fx = cx_f - floorf(cx_f);
-    float fy = cy_f - floorf(cy_f);
-    float fz = cz_f - floorf(cz_f);
-    int sx = (fx < 0.5f) ? -1 : 1;
-    int sy = (fy < 0.5f) ? -1 : 1;
-    int sz = (fz < 0.5f) ? -1 : 1;
 
 	glm::vec3 perceived_center(0.0f, 0.0f, 0.0f);
 	glm::vec3 c(0.0f, 0.0f, 0.0f);
 	glm::vec3 perceived_velocity(0.0f, 0.0f, 0.0f);
 	int n1 = 0, n3 = 0;
-	int offsetX[2] = { 0, sx };
-	int offsetY[2] = { 0, sy };
-	int offsetZ[2] = { 0, sz };
 
-    for (int i = 0; i < 2; i++) {
-        int nx = cx + offsetX[i];
-        if (nx < 0 || nx >= gridResolution) {
-            continue;
-        }
-        for (int j = 0; j < 2; j++) {
-            int ny = cy + offsetY[j];
-            if (ny < 0 || ny >= gridResolution) {
+	const float R = imax(imax(rule1Distance, rule2Distance), rule3Distance);
+
+    if (cellWidth >= 2 * R) {
+
+        float fx = cx_f - floorf(cx_f);
+        float fy = cy_f - floorf(cy_f);
+        float fz = cz_f - floorf(cz_f);
+        int sx = (fx < 0.5f) ? -1 : 1;
+        int sy = (fy < 0.5f) ? -1 : 1;
+        int sz = (fz < 0.5f) ? -1 : 1;
+
+        int offsetX[2] = { 0, sx };
+        int offsetY[2] = { 0, sy };
+        int offsetZ[2] = { 0, sz };
+
+        for (int i = 0; i < 2; i++) {
+            int nx = cx + offsetX[i];
+            if (nx < 0 || nx >= gridResolution) {
                 continue;
             }
-            for (int k = 0; k < 2; k++) {
-                int nz = cz + offsetZ[k];
-                if (nz < 0 || nz >= gridResolution) {
+            for (int j = 0; j < 2; j++) {
+                int ny = cy + offsetY[j];
+                if (ny < 0 || ny >= gridResolution) {
                     continue;
                 }
-                int cellId = gridIndex3Dto1D(nx, ny, nz, gridResolution);
-                int startIdx = gridCellStartIndices[cellId];
-                int endIdx = gridCellEndIndices[cellId];
-                if (startIdx == -1 || endIdx == -1) {
-                    continue;
-                }
-                for (int idx = startIdx; idx <= endIdx; idx++) {
-                    if (idx == index) {
+                for (int k = 0; k < 2; k++) {
+                    int nz = cz + offsetZ[k];
+                    if (nz < 0 || nz >= gridResolution) {
                         continue;
                     }
-                    glm::vec3 otherPos = pos[idx];
-                    float distance = glm::length(otherPos - p);
-                    if (distance < rule1Distance) {
-                        perceived_center += otherPos;
-                        n1++;
+                    int cellId = gridIndex3Dto1D(nx, ny, nz, gridResolution);
+                    int startIdx = gridCellStartIndices[cellId];
+                    int endIdx = gridCellEndIndices[cellId];
+                    if (startIdx == -1 || endIdx == -1) {
+                        continue;
                     }
-                    if (distance < rule2Distance) {
-                        c -= (otherPos - p);
+                    for (int idx = startIdx; idx <= endIdx; idx++) {
+                        if (idx == index) {
+                            continue;
+                        }
+                        glm::vec3 otherPos = pos[idx];
+                        float distance = glm::length(otherPos - p);
+                        if (distance < rule1Distance) {
+                            perceived_center += otherPos;
+                            n1++;
+                        }
+                        if (distance < rule2Distance) {
+                            c -= (otherPos - p);
+                        }
+                        if (distance < rule3Distance) {
+                            perceived_velocity += vel1[idx];
+                            n3++;
+                        }
                     }
-                    if (distance < rule3Distance) {
-                        perceived_velocity += vel1[idx];
-                        n3++;
+                }
+            }
+        }
+    }
+    else {
+        for (int i = -1; i < 2; i++) {
+            int nx = cx + i;
+            if (nx < 0 || nx >= gridResolution) {
+                continue;
+            }
+            for (int j = -1; j < 2; j++) {
+                int ny = cy + j;
+                if (ny < 0 || ny >= gridResolution) {
+                    continue;
+                }
+                for (int k = -1; k < 2; k++) {
+                    int nz = cz + k;
+                    if (nz < 0 || nz >= gridResolution) {
+                        continue;
+                    }
+                    int cellId = gridIndex3Dto1D(nx, ny, nz, gridResolution);
+                    int startIdx = gridCellStartIndices[cellId];
+                    int endIdx = gridCellEndIndices[cellId];
+                    if (startIdx == -1 || endIdx == -1) {
+                        continue;
+                    }
+                    for (int idx = startIdx; idx <= endIdx; idx++) {
+                        if (idx == index) {
+                            continue;
+                        }
+                        glm::vec3 otherPos = pos[idx];
+                        float distance = glm::length(otherPos - p);
+                        if (distance < rule1Distance) {
+                            perceived_center += otherPos;
+                            n1++;
+                        }
+                        if (distance < rule2Distance) {
+                            c -= (otherPos - p);
+                        }
+                        if (distance < rule3Distance) {
+                            perceived_velocity += vel1[idx];
+                            n3++;
+                        }
                     }
                 }
             }
