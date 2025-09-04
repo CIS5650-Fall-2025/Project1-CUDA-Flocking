@@ -64,6 +64,8 @@ void checkCUDAError(const char* msg, int line = -1) {
 /*! Size of the starting area in simulation space. */
 #define scene_scale 100.0f
 
+#define SINGLESIZE_CELL 1
+
 /***********************************************
 * Kernel state (pointers are device pointers) *
 ***********************************************/
@@ -173,7 +175,11 @@ void Boids::initSimulation(int N) {
 	checkCUDAErrorWithLine("kernGenerateRandomPosArray failed!");
 
 	// LOOK-2.1 computing grid params
+#if SINGLESIZE_CELL
+	gridCellWidth = std::max(std::max(rule1Distance, rule2Distance), rule3Distance);
+#else
 	gridCellWidth = 2.0f * std::max(std::max(rule1Distance, rule2Distance), rule3Distance);
+#endif
 	int halfSideCount = (int)(scene_scale / gridCellWidth) + 1;
 	gridSideCount = 2 * halfSideCount;
 
@@ -601,9 +607,15 @@ __global__ void kernUpdateVelNeighborSearchScattered(
 	int arrayIndex = particleArrayIndices[index];
 	// find neighbor cells
 	glm::vec3 posToGridMin = pos[arrayIndex] - gridMin;
+#if SINGLESIZE_CELL
+	int neighborCells[27];
+	glm::vec3 minNeighborCellIdx3D = glm::max(glm::floor((posToGridMin - cellWidth) * inverseCellWidth), glm::vec3(0));
+	glm::vec3 maxNeighborCellIdx3D = glm::min(glm::floor((posToGridMin + cellWidth) * inverseCellWidth), glm::vec3(gridResolution - 1));
+#else
 	int neighborCells[8];
-	glm::vec3 minNeighborCellIdx3D = glm::floor((posToGridMin - 0.5f * cellWidth) * inverseCellWidth);
-	glm::vec3 maxNeighborCellIdx3D = glm::floor((posToGridMin + 0.5f * cellWidth) * inverseCellWidth);
+	glm::vec3 minNeighborCellIdx3D = glm::max(glm::floor((posToGridMin - 0.5f * cellWidth) * inverseCellWidth), glm::vec3(0));
+	glm::vec3 maxNeighborCellIdx3D = glm::min(glm::floor((posToGridMin + 0.5f * cellWidth) * inverseCellWidth), glm::vec3(gridResolution - 1));
+#endif
 	int neighborCellCount = 0;
 	// should use z-y-x order
 	for (int k = minNeighborCellIdx3D[2]; k <= maxNeighborCellIdx3D[2]; ++k) {
@@ -645,9 +657,15 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
 	}
 	// find neighbor cells
 	glm::vec3 posToGridMin = pos[index] - gridMin;
+#if SINGLESIZE_CELL
+	int neighborCells[27];
+	glm::vec3 minNeighborCellIdx3D = glm::max(glm::floor((posToGridMin - cellWidth) * inverseCellWidth), glm::vec3(0));
+	glm::vec3 maxNeighborCellIdx3D = glm::min(glm::floor((posToGridMin + cellWidth) * inverseCellWidth), glm::vec3(gridResolution - 1));
+#else
 	int neighborCells[8];
-	glm::vec3 minNeighborCellIdx3D = glm::floor((posToGridMin - 0.5f * cellWidth) * inverseCellWidth);
-	glm::vec3 maxNeighborCellIdx3D = glm::floor((posToGridMin + 0.5f * cellWidth) * inverseCellWidth);
+	glm::vec3 minNeighborCellIdx3D = glm::max(glm::floor((posToGridMin - 0.5f * cellWidth) * inverseCellWidth), glm::vec3(0));
+	glm::vec3 maxNeighborCellIdx3D = glm::min(glm::floor((posToGridMin + 0.5f * cellWidth) * inverseCellWidth), glm::vec3(gridResolution - 1));
+#endif
 	int neighborCellCount = 0;
 	// should use z-y-x order
 	for (int k = minNeighborCellIdx3D[2]; k <= maxNeighborCellIdx3D[2]; ++k) {
@@ -692,9 +710,15 @@ __global__ void kernUpdateVelNeighborSearchCoherentSharedMem(
 	glm::vec3 thispos = pos[index];
 	// find neighbor cells
 	glm::vec3 posToGridMin = thispos - gridMin;
+#if SINGLESIZE_CELL
+	int neighborCells[27];
+	glm::vec3 minNeighborCellIdx3D = glm::max(glm::floor((posToGridMin - cellWidth) * inverseCellWidth), glm::vec3(0));
+	glm::vec3 maxNeighborCellIdx3D = glm::min(glm::floor((posToGridMin + cellWidth) * inverseCellWidth), glm::vec3(gridResolution - 1));
+#else
 	int neighborCells[8];
-	glm::vec3 minNeighborCellIdx3D = glm::floor((posToGridMin - 0.5f * cellWidth) * inverseCellWidth);
-	glm::vec3 maxNeighborCellIdx3D = glm::floor((posToGridMin + 0.5f * cellWidth) * inverseCellWidth);
+	glm::vec3 minNeighborCellIdx3D = glm::max(glm::floor((posToGridMin - 0.5f * cellWidth) * inverseCellWidth), glm::vec3(0));
+	glm::vec3 maxNeighborCellIdx3D = glm::min(glm::floor((posToGridMin + 0.5f * cellWidth) * inverseCellWidth), glm::vec3(gridResolution - 1));
+#endif
 	int neighborCellCount = 0;
 	// should use z-y-x order
 	for (int k = minNeighborCellIdx3D[2]; k <= maxNeighborCellIdx3D[2]; ++k) {
