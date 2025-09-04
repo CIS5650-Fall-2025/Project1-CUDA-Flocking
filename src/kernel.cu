@@ -450,8 +450,8 @@ __global__ void kernUpdateVelNeighborSearchScattered(
         return;
     }
 
-    glm::vec3 myPos = pos[iSelf];
-    glm::vec3 myVel = vel1[iSelf];
+    const glm::vec3 myPos = pos[iSelf];
+    const glm::vec3 myVel = vel1[iSelf];
     glm::vec3 finalVel(myVel);
 
     int cohesion_neighbors = 0;
@@ -463,44 +463,48 @@ __global__ void kernUpdateVelNeighborSearchScattered(
 
     glm::vec3 cohesion_center(0.0f);
 
-    glm::ivec3 gridIndex3d = glm::ivec3((myPos - gridMin) * inverseCellWidth);
+    const glm::vec3 relativePosition = (myPos - gridMin) * inverseCellWidth;
+    const glm::ivec3 gridIndex3d = glm::ivec3(relativePosition);
     
     // Iterate over all neighboring cells
-    const int CELL_MAX_IDX = gridResolution - 1;
-    int z, y, x;
-    for (int zIt = gridIndex3d.z - 1; zIt < gridIndex3d.z + 1; ++zIt)
+    const float neighborhoodDistance = imax(imax(rule1Distance, rule2Distance), rule3Distance);
+    const int searchRadius = (int)ceil(neighborhoodDistance / cellWidth);
+
+    const glm::vec3 index_boundaries(glm::vec3(gridIndex3d) + glm::vec3(0.5f));
+
+    const int minZ = (relativePosition.z >  index_boundaries.z) ? gridIndex3d.z : imax(gridIndex3d.z - searchRadius, 0);
+    const int maxZ = (relativePosition.z <= index_boundaries.z) ? gridIndex3d.z : imin(gridIndex3d.z + searchRadius, gridResolution-1);
+
+    const int minY = (relativePosition.y >  index_boundaries.y) ? gridIndex3d.y : imax(gridIndex3d.y - searchRadius, 0);
+    const int maxY = (relativePosition.y <= index_boundaries.y) ? gridIndex3d.y : imin(gridIndex3d.y + searchRadius, gridResolution-1);
+
+    const int minX = (relativePosition.x >  index_boundaries.x) ? gridIndex3d.x : imax(gridIndex3d.x - searchRadius, 0);
+    const int maxX = (relativePosition.x <= index_boundaries.x) ? gridIndex3d.x : imin(gridIndex3d.x + searchRadius, gridResolution-1);
+
+    for (int z = minZ; z <= maxZ; ++z)
     {
-        z = zIt;
-        if (z < 0) z = CELL_MAX_IDX;
-        else if (z >= gridResolution) z = 0;
-
-        for (int yIt = gridIndex3d.y - 1; yIt < gridIndex3d.y + 1; ++yIt)
+        for (int y = minY; y <= maxY; ++y)
         {
-            y = yIt;
-            if (y < 0) y = CELL_MAX_IDX;
-            else if (y >= gridResolution) y = 0;
-
-            for (int xIt = gridIndex3d.x - 1; xIt < gridIndex3d.x + 1; ++xIt)
+            for (int x = minX; x <= maxX; ++x)
             {
-                x = xIt;
-                if (x < 0) x = CELL_MAX_IDX;
-                else if (x >= gridResolution) x = 0;
-
-                int gridIndex1d = gridIndex3Dto1D(x, y, z, gridResolution);
+                const int gridIndex1d = gridIndex3Dto1D(x, y, z, gridResolution);
                 
-                int cellStart = gridCellStartIndices[gridIndex1d];
-                int cellEnd = gridCellEndIndices[gridIndex1d];
+                const int cellStart = gridCellStartIndices[gridIndex1d];
+                if (cellStart == -1)
+                    continue; // Cell has no boids
+
+                const int cellEnd = gridCellEndIndices[gridIndex1d];
 
                 // For this cell, iterate over all its boids.
                 for (int cellIt = cellStart; cellIt <= cellEnd; cellIt++)
                 {
-                    int boidIdx = particleArrayIndices[cellIt];
+                    const int boidIdx = particleArrayIndices[cellIt];
                     if (boidIdx == iSelf) continue;
 
-                    glm::vec3 otherPos = pos[boidIdx];
-                    glm::vec3 otherVel = vel1[boidIdx];
+                    const glm::vec3& otherPos = pos[boidIdx];
+                    const glm::vec3& otherVel = vel1[boidIdx];
 
-                    float distance = glm::distance(otherPos, myPos);
+                    const float distance = glm::distance(otherPos, myPos);
 
                     if (distance < rule1Distance)
                     {
@@ -603,7 +607,6 @@ void Boids::stepSimulationScatteredGrid(float dt) {
     int N = numObjects;
     dim3 fullBlocksPerGrid((N + blockSize - 1) / blockSize);
 
-    //kernResetIntBuffer<<<fullBlocksPerGrid, blockSize>>>(gridCellCount, dev_gridCellStartIndices, -1);
     //kernResetIntBuffer<<<fullBlocksPerGrid, blockSize>>>(gridCellCount, dev_gridCellEndIndices, -1);
 
     kernComputeIndices<<<fullBlocksPerGrid, blockSize>>>(N, gridSideCount, gridMinimum, gridInverseCellWidth, 
@@ -613,6 +616,7 @@ void Boids::stepSimulationScatteredGrid(float dt) {
     dev_thrust_particleGridIndices = thrust::device_ptr<int>(dev_particleGridIndices);
     thrust::sort_by_key(dev_thrust_particleGridIndices, dev_thrust_particleGridIndices + N, dev_thrust_particleArrayIndices);
 
+    kernResetIntBuffer<<<fullBlocksPerGrid, blockSize>>>(gridCellCount, dev_gridCellStartIndices, -1);
     kernIdentifyCellStartEnd<<<fullBlocksPerGrid, blockSize>>>(N, dev_particleGridIndices, dev_gridCellStartIndices, dev_gridCellEndIndices);
 
     kernUpdateVelNeighborSearchScattered<<<fullBlocksPerGrid, blockSize>>>(N, gridSideCount, gridMinimum, 
