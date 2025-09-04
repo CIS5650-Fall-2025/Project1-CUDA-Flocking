@@ -7,13 +7,13 @@ Project 1 - Flocking**
 
 ![](images/boids.gif)
 
-### Performance Analysis:
+# Performance Analysis:
 
-** Block size impact **
+## Block size impact
 Block size testing was done with N = 100,000. 
 ![](images/fps_blocksize.png)
 
-** Boid count impact**
+## Boid count impact
 A naive implementation 
 
 
