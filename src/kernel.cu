@@ -412,14 +412,6 @@ __global__ void kernUpdateVelNeighborSearchScattered(
   int *gridCellStartIndices, int *gridCellEndIndices,
   int *particleArrayIndices,
   glm::vec3 *pos, glm::vec3 *vel1, glm::vec3 *vel2) {
-  // TODO-2.1 - Update a boid's velocity using the uniform grid to reduce
-  // the number of boids that need to be checked.
-  // - Identify the grid cell that this particle is in
-  // - Identify which cells may contain neighbors. This isn't always 8.
-  // - For each cell, read the start/end indices in the boid pointer array.
-  // - Access each boid in the cell and compute velocity change from
-  //   the boids rules, if this boid is within the neighborhood distance.
-  // - Clamp the speed change before putting the new speed in vel2
     int index = (blockIdx.x * blockDim.x) + threadIdx.x;
     if (index >= N) {
         return;
@@ -434,35 +426,38 @@ __global__ void kernUpdateVelNeighborSearchScattered(
 
     glm::vec3 calcVel = vel1[index];
 
-    glm::ivec3 roundedPos = (pos[index] - gridMin) * inverseCellWidth;
-    int gridIndex = gridIndex3Dto1D(roundedPos.x, roundedPos.y, roundedPos.z, gridResolution);
+    glm::vec3 gridPos = (pos[index] - gridMin) * inverseCellWidth;
+    glm::ivec3 roundedGridStart = glm::round(gridPos - glm::vec3(1,1,1));
+
     int maxGridIndex = gridResolution * gridResolution * gridResolution;
     
-    for (float zGrid = -1; zGrid <= 1; ++zGrid) {
-        for (float yGrid = -1; yGrid <= 1; ++yGrid) {
-            for (float xGrid = -1; xGrid <= 1; ++xGrid) {
-                glm::vec3 shiftedPos = pos[index] + glm::vec3(xGrid, yGrid, zGrid) * cellWidth / 2.f;
-                glm::ivec3 roundedNeighborPos = (shiftedPos - gridMin) * inverseCellWidth;
+    for (float zGrid = 0; zGrid <= 1; ++zGrid) {
+        for (float yGrid = 0; yGrid <= 1; ++yGrid) {
+            for (float xGrid = 0; xGrid <= 1; ++xGrid) {
+                glm::ivec3 roundedNeighborPos = roundedGridStart + glm::ivec3(xGrid,yGrid,zGrid);
+
                 int neighborGridIndex = gridIndex3Dto1D(roundedNeighborPos.x, roundedNeighborPos.y, roundedNeighborPos.z, gridResolution);
                 
-                if (neighborGridIndex != gridIndex && neighborGridIndex >= 0 && neighborGridIndex < maxGridIndex) {
-                    for (int gbIndex = gridCellStartIndices[neighborGridIndex]; gbIndex < gridCellEndIndices[neighborGridIndex] && gridCellStartIndices[neighborGridIndex] >= 0; ++gbIndex) {
+                if (neighborGridIndex >= 0 && neighborGridIndex < maxGridIndex && gridCellStartIndices[neighborGridIndex] >= 0) {
+                    for (int gbIndex = gridCellStartIndices[neighborGridIndex]; gbIndex < gridCellEndIndices[neighborGridIndex]; ++gbIndex) {
                         int b = particleArrayIndices[gbIndex];
 
                         if (b == index) {
                             continue;
                         }
 
-                        if (glm::distance(pos[index], pos[b]) < rule1Distance) {
+                        float dist = glm::distance(pos[index], pos[b]);
+
+                        if (dist < rule1Distance) {
                             neighborNum++;
                             center += pos[b];
                         }
 
-                        if (glm::distance(pos[index], pos[b]) < rule2Distance) {
+                        if (dist < rule2Distance) {
                             push -= (pos[b] - pos[index]);
                         }
 
-                        if (glm::distance(pos[index], pos[b]) < rule3Distance) {
+                        if (dist < rule3Distance) {
                             neighborVelNum++;
                             neighborVel += vel1[b];
                         }
@@ -473,21 +468,21 @@ __global__ void kernUpdateVelNeighborSearchScattered(
         }
     }
 
-        if (neighborNum > 0) {
-            center /= (float)neighborNum;
-            calcVel += (center - pos[index]) * rule1Scale;
-        }
-
-        calcVel += push * rule2Scale;
-
-        if (neighborVelNum > 0) {
-            neighborVel /= (float)neighborVelNum;
-            calcVel += neighborVel * rule3Scale;
-        }
-
-        calcVel = glm::length(calcVel) > maxSpeed ? glm::normalize(calcVel) * maxSpeed : calcVel;
-        vel2[index] = calcVel;
+    if (neighborNum > 0) {
+        center /= (float)neighborNum;
+        calcVel += (center - pos[index]) * rule1Scale;
     }
+
+    calcVel += push * rule2Scale;
+
+    if (neighborVelNum > 0) {
+        neighborVel /= (float)neighborVelNum;
+        calcVel += neighborVel * rule3Scale;
+    }
+
+    calcVel = glm::length(calcVel) > maxSpeed ? glm::normalize(calcVel) * maxSpeed : calcVel;
+    vel2[index] = calcVel;
+}
 
 __global__ void kernUpdateVelNeighborSearchCoherent(
   int N, int gridResolution, glm::vec3 gridMin,
@@ -506,6 +501,9 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
   // - Access each boid in the cell and compute velocity change from
   //   the boids rules, if this boid is within the neighborhood distance.
   // - Clamp the speed change before putting the new speed in vel2
+
+
+
 }
 
 /**
@@ -556,7 +554,11 @@ void Boids::stepSimulationScatteredGrid(float dt) {
         dev_particleArrayIndices,
         dev_pos, dev_vel1, dev_vel2);
 
+    cudaDeviceSynchronize();
+
     kernUpdatePos <<< fullBlocksPerGrid, blockSize >> > (numObjects, dt, dev_pos, dev_vel2);
+
+    cudaDeviceSynchronize();
 
     cudaMemcpy(dev_vel1, dev_vel2, sizeof(glm::vec3) * numObjects, cudaMemcpyDeviceToDevice);
 }
