@@ -12,6 +12,9 @@
 #include <iostream>
 #include <memory>
 #include <sstream>
+#include <iomanip>
+#include <chrono>
+
 
 #include <cuda_runtime.h>
 #include <cuda_gl_interop.h>
@@ -22,13 +25,57 @@
 // ================
 
 // LOOK-2.1 LOOK-2.3 - toggles for UNIFORM_GRID and COHERENT_GRID
-#define VISUALIZE 1
+#define VISUALIZE 0
 #define UNIFORM_GRID 1
 #define COHERENT_GRID 1
 
 // LOOK-1.2 - change this to adjust particle count in the simulation
-const int N_FOR_VIS = 500000;
+const int N_FOR_VIS = 5000;
 const float DT = 0.2f;
+
+// Statistics tracking variables
+double totalRunTime = 0.0;
+double totalFrames = 0;
+double averageFPS = 0.0;
+std::chrono::high_resolution_clock::time_point startTime;
+
+void printFinalStatistics() {
+    std::cout << "\n========================================" << std::endl;
+    std::cout << "        SIMULATION STATISTICS" << std::endl;
+    std::cout << "========================================" << std::endl;
+
+    // Number of boids
+    std::cout << "Number of Boids: " << N_FOR_VIS << std::endl;
+
+    // Simulation method
+    std::string method;
+#if UNIFORM_GRID && COHERENT_GRID
+    method = "Coherent Grid";
+#elif UNIFORM_GRID
+    method = "Scattered Grid";
+#else
+    method = "Naive (Brute Force)";
+#endif
+    std::cout << "Simulation Method: " << method << std::endl;
+
+    // Total run time
+    std::cout << "Total Run Time: " << std::fixed << std::setprecision(2)
+        << totalRunTime << " seconds" << std::endl;
+
+    // Average FPS
+    averageFPS = totalFrames / totalRunTime;
+    std::cout << "Average Frame Rate: " << std::fixed << std::setprecision(2)
+        << averageFPS << " FPS" << std::endl;
+
+    // Additional GPU info
+    cudaDeviceProp deviceProp;
+    cudaGetDeviceProperties(&deviceProp, 0);
+    std::cout << "GPU Used: " << deviceProp.name << std::endl;
+    std::cout << "GPU Memory: " << (deviceProp.totalGlobalMem / (1024 * 1024)) << " MB" << std::endl;
+
+    std::cout << "========================================" << std::endl;
+}
+
 
 /**
 * C main function.
@@ -38,6 +85,7 @@ int main(int argc, char* argv[]) {
 
   if (init(argc, argv)) {
     mainLoop();
+    printFinalStatistics();
     Boids::endSimulation();
     return 0;
   } else {
@@ -222,52 +270,64 @@ void initShaders(GLuint * program) {
   }
 
   void mainLoop() {
-    double fps = 0;
-    double timebase = 0;
-    int frame = 0;
+      double fps = 0;
+      double timebase = 0;
+      int frame = 0;
+      double totalPowerSamples = 0;
+      int powerSampleCount = 0;
 
-    Boids::unitTest(); // LOOK-1.2 We run some basic example code to make sure
-                       // your CUDA development setup is ready to go.
+      Boids::unitTest(); // LOOK-1.2 We run some basic example code to make sure
+      // your CUDA development setup is ready to go.
 
-    while (!glfwWindowShouldClose(window)) {
-      glfwPollEvents();
+// Record start time
+      startTime = std::chrono::high_resolution_clock::now();
 
-      frame++;
-      double time = glfwGetTime();
+      while (!glfwWindowShouldClose(window)) {
+          glfwPollEvents();
 
-      if (time - timebase > 1.0) {
-        fps = frame / (time - timebase);
-        timebase = time;
-        frame = 0;
+          frame++;
+          totalFrames++;
+          double time = glfwGetTime();
+
+          if (time - timebase > 1.0) {
+              fps = frame / (time - timebase);
+              timebase = time;
+              frame = 0;
+          }
+
+          runCUDA();
+
+          std::ostringstream ss;
+          ss << "[";
+          ss.precision(1);
+          ss << std::fixed << fps;
+          ss << " fps] " << deviceName;
+          glfwSetWindowTitle(window, ss.str().c_str());
+
+          glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+#if VISUALIZE
+          glUseProgram(program[PROG_BOID]);
+          glBindVertexArray(boidVAO);
+          glPointSize((GLfloat)pointSize);
+          glDrawElements(GL_POINTS, N_FOR_VIS + 1, GL_UNSIGNED_INT, 0);
+          glPointSize(1.0f);
+
+          glUseProgram(0);
+          glBindVertexArray(0);
+
+          glfwSwapBuffers(window);
+#endif
       }
 
-      runCUDA();
-
-      std::ostringstream ss;
-      ss << "[";
-      ss.precision(1);
-      ss << std::fixed << fps;
-      ss << " fps] " << deviceName;
-      glfwSetWindowTitle(window, ss.str().c_str());
-
-      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-      #if VISUALIZE
-      glUseProgram(program[PROG_BOID]);
-      glBindVertexArray(boidVAO);
-      glPointSize((GLfloat)pointSize);
-      glDrawElements(GL_POINTS, N_FOR_VIS + 1, GL_UNSIGNED_INT, 0);
-      glPointSize(1.0f);
-
-      glUseProgram(0);
-      glBindVertexArray(0);
-
-      glfwSwapBuffers(window);
-      #endif
-    }
-    glfwDestroyWindow(window);
-    glfwTerminate();
+      // Calculate total run time
+      auto endTime = std::chrono::high_resolution_clock::now();
+      std::chrono::duration<double> elapsed = endTime - startTime;
+      totalRunTime = elapsed.count();
+      glfwDestroyWindow(window);
+      glfwTerminate();
   }
+
 
 
   void errorCallback(int error, const char *description) {
