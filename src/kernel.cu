@@ -547,44 +547,48 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
   ny = imax(0, imin(gridResolution - 1, ny));
   nz = imax(0, imin(gridResolution - 1, nz));
 
-  int xs[2] = { grid_x, nx };
-  int ys[2] = { grid_y, ny };
-  int zs[2] = { grid_z, nz };
-  //check for duplicates
-  int xCount = (nx == grid_x) ? 1 : 2;
-  int yCount = (ny == grid_y) ? 1 : 2;
-  int zCount = (nz == grid_z) ? 1 : 2;
+  //int xs[2] = { grid_x, nx };
+  //int ys[2] = { grid_y, ny };
+  //int zs[2] = { grid_z, nz };
+  ////check for duplicates
+  //int xCount = (nx == grid_x) ? 1 : 2;
+  //int yCount = (ny == grid_y) ? 1 : 2;
+  //int zCount = (nz == grid_z) ? 1 : 2;
+  int xMin = (nx < grid_x) ? nx : grid_x;
+  int xMax = (nx < grid_x) ? grid_x : nx;
+  int yMin = (ny < grid_y) ? ny : grid_y;
+  int yMax = (ny < grid_y) ? grid_y : ny;
+  int zMin = (nz < grid_z) ? nz : grid_z;
+  int zMax = (nz < grid_z) ? grid_z : nz;
 
   glm::vec3 centre(0), separation(0), averageV(0);
   int count1 = 0, count3 = 0;
 
   // - For each cell, read the start/end indices in the boid pointer array.
-  for (int x = 0; x < xCount; x++) {
-    for (int y = 0; y < yCount; y++) {
-      for (int z = 0; z < zCount; z++) {
-        int cx = xs[x], cy = ys[y], cz = zs[z];
-        int cell = gridIndex3Dto1D(cx, cy, cz, gridResolution);
+  for (int z = zMin; z <= zMax; z++) {
+    int zBase = z * gridResolution * gridResolution;
+    for (int y = yMin; y <= yMax; y++) {
+      int base = zBase + y * gridResolution + xMin;
+      for (int x = xMin; x <= xMax; x++, base++) {
 
-        int start = gridCellStartIndices[cell];
+        int start = gridCellStartIndices[base];
         if (start == -1) continue;
-        int end = gridCellEndIndices[cell];
+        int end = gridCellEndIndices[base];
 
         for (int k = start; k <= end; k++) {
-          int j = k;
-          if (j == i) continue;
-
-          glm::vec3 d = pos[j] - p;
+          if (k == i) continue;
+          glm::vec3 d = pos[k] - p;
           float dist = glm::length(d);
 
           if (dist < rule1Distance) {
-            centre += pos[j];
+            centre += pos[k];
             count1++;
           }
           if (dist < rule2Distance) {
             separation -= d;
           }
           if (dist < rule3Distance) {
-            averageV += vel1[j];
+            averageV += vel1[k];
             count3++;
           }
         }
