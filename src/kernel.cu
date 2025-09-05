@@ -369,6 +369,26 @@ __global__ void kernIdentifyCellStartEnd(int N, int *particleGridIndices,
   // Identify the start point of each cell in the gridIndices array.
   // This is basically a parallel unrolling of a loop that goes
   // "this index doesn't match the one before it, must be a new cell!"
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i >= N) return;
+   
+  int curr = particleGridIndices[i];
+
+  if (i == 0) {
+    gridCellStartIndices[curr] = 0; 
+  } else
+  {
+    int prev = particleGridIndices[i - 1];
+    if (prev != curr)
+    {
+      gridCellEndIndices[prev] = i - 1;
+      gridCellStartIndices[curr] = i;
+    }
+  }
+  if (i == N - 1)
+  {
+    gridCellEndIndices[curr] = i;
+  }
 }
 
 __global__ void kernUpdateVelNeighborSearchScattered(
@@ -432,8 +452,11 @@ void Boids::stepSimulationScatteredGrid(float dt) {
   // In Parallel:
   // - label each particle with its array index as well as its grid index.
   //   Use 2x width grids.
+  kernComputeIndices << <blocks, blockSize >> > (N, gridSideCount, gridMinimum, gridInverseCellWidth,
+    dev_pos, dev_particleArrayIndices, dev_particleGridIndices);
   // - Unstable key sort using Thrust. A stable sort isn't necessary, but you
   //   are welcome to do a performance comparison.
+  thrust::sort_by_key(dev_thrust_particleGridIndices, dev_thrust_particleGridIndices + N, dev_particleArrayIndices);
   // - Naively unroll the loop for finding the start and end indices of each
   //   cell's data pointers in the array of boid indices
   // - Perform velocity updates using neighbor search
