@@ -180,6 +180,12 @@ void Boids::initSimulation(int N) {
   gridMinimum.z -= halfGridWidth;
 
   // TODO-2.1 TODO-2.3 - Allocate additional buffers here.
+  cudaMalloc(&dev_particleArrayIndices, N * sizeof(int));
+  cudaMalloc(&dev_particleGridIndices, N * sizeof(int));
+  cudaMalloc(&dev_gridCellStartIndices, gridCellCount * sizeof(int));
+  cudaMalloc(&dev_gridCellEndIndices, gridCellCount * sizeof(int));
+  dev_thrust_particleGridIndices = thrust::device_ptr<int>(dev_particleGridIndices);
+  dev_thrust_particleArrayIndices = thrust::device_ptr<int>(dev_particleArrayIndices);
   cudaDeviceSynchronize();
 }
 
