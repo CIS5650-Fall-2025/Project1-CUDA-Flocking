@@ -64,6 +64,8 @@ void checkCUDAError(const char *msg, int line = -1) {
 /*! Size of the starting area in simulation space. */
 #define scene_scale 100.0f
 
+#define periodicDistance false
+
 /***********************************************
 * Kernel state (pointers are device pointers) *
 ***********************************************/
@@ -245,6 +247,18 @@ void Boids::copyBoidsToVBO(float *vbodptr_positions, float *vbodptr_velocities) 
 * stepSimulation *
 ******************/
 
+// Compute offset taking into account that boids can wrap around the edges
+__device__ glm::vec3 computeOffsetWrapped(glm::vec3 a, glm::vec3 b, float domainWidth) {
+    glm::vec3 domain(domainWidth);
+    glm::vec3 offset = b - a;
+
+    offset.x -= roundf(offset.x / domainWidth) * domainWidth;
+    offset.y -= roundf(offset.y / domainWidth) * domainWidth;
+    offset.z -= roundf(offset.z / domainWidth) * domainWidth;
+
+    return offset;
+}
+
 /**
 * LOOK-1.2 You can use this as a helper for kernUpdateVelocityBruteForce.
 * __device__ code can be called from a __global__ context
@@ -270,21 +284,29 @@ __device__ glm::vec3 computeVelocityChange(int N, int iSelf, const glm::vec3 *po
         if (i == iSelf) {
             continue;
         }
-        float distance = glm::length(pos[i] - selfPos);
+
+        glm::vec3 offset;
+        if (periodicDistance == true) {
+            offset = computeOffsetWrapped(selfPos, pos[i], 2.f * scene_scale);
+        }
+        else {
+            offset = pos[i] - selfPos;
+        }
+        float distance2 = glm::dot(offset, offset);
 
         // Rule 1
-        if (distance < rule1Distance) {
+        if (distance2 < rule1Distance * rule1Distance) {
             perceivedCenter += pos[i];
             neighbors1++;
         }
 
         // Rule 2
-        if (distance < rule2Distance) {
-            c -= (pos[i] - selfPos);
+        if (distance2 < rule2Distance * rule2Distance) {
+            c -= offset;
         }
 
         // Rule 3
-        if (distance < rule3Distance) {
+        if (distance2 < rule3Distance * rule3Distance) {
             perceivedVelocity += vel[i];
             neighbors3++;
         }
@@ -310,21 +332,7 @@ __device__ glm::vec3 computeVelocityChange(int N, int iSelf, const glm::vec3 *po
     return v1 + v2 + v3;
 }
 
-// Compute offset taking into account that boids can wrap around the edges
-__device__ glm::vec3 computeOffsetWrapped(glm::vec3 a, glm::vec3 b, int gridResolution, float cellWidth) {
-    glm::vec3 domain = glm::vec3(gridResolution * cellWidth);
-    glm::vec3 offset = b - a;
 
-    for (int i = 0; i < 3; i++) {
-        if (offset[i] > 0.5f * domain[i]) {
-            offset[i] -= domain[i];
-        }
-        if (offset[i] < -0.5f * domain[i]) {
-            offset[i] += domain[i];
-        }
-    }
-    return offset;
-}
 
 /**
 * TODO-1.2 implement basic flocking
@@ -477,33 +485,39 @@ __global__ void kernUpdateVelNeighborSearchScattered(
     int neighbors3 = 0;
 
     float fx = (selfPos.x - gridMin.x) / cellWidth - floor((selfPos.x - gridMin.x) / cellWidth);
-    float distToMinusFaceX = fx * cellWidth;
-    float distToPlusFaceX = cellWidth - distToMinusFaceX;
     int stepX = 0;
-    if (distToMinusFaceX <= cellWidth/2) stepX = -1;
-    else if (distToPlusFaceX < cellWidth/2) stepX = +1;
+    if ((fx * cellWidth) <= cellWidth/2) stepX = -1;
+    else if ((cellWidth - (fx * cellWidth)) < cellWidth/2) stepX = +1;
 
     float fy = (selfPos.y - gridMin.y) / cellWidth - floor((selfPos.y - gridMin.y) / cellWidth);
-    float distToMinusFaceY = fy * cellWidth;
-    float distToPlusFaceY = cellWidth - distToMinusFaceY;
     int stepY = 0;
-    if (distToMinusFaceY <= cellWidth / 2) stepY = -1;
-    else if (distToPlusFaceY < cellWidth / 2) stepY = +1;
+    if ((fy * cellWidth) <= cellWidth / 2) stepY = -1;
+    else if ((cellWidth - (fy * cellWidth)) < cellWidth / 2) stepY = +1;
 
     float fz = (selfPos.z - gridMin.z) / cellWidth - floor((selfPos.z - gridMin.z) / cellWidth);
-    float distToMinusFaceZ = fz * cellWidth;
-    float distToPlusFaceZ = cellWidth - distToMinusFaceZ;
     int stepZ = 0;
-    if (distToMinusFaceZ <= cellWidth / 2) stepZ = -1;
-    else if (distToPlusFaceZ < cellWidth / 2) stepZ = +1;
+    if ((fz * cellWidth) <= cellWidth / 2) stepZ = -1;
+    else if ((cellWidth - (fz * cellWidth)) < cellWidth / 2) stepZ = +1;
 
     for (int dx : {0, stepX != 0 ? stepX : 0}) {
-        int nx = (ix + dx + gridResolution) % gridResolution;
         for (int dy : {0, stepY != 0 ? stepY : 0}) {
-            int ny = (iy + dy + gridResolution) % gridResolution;
             for (int dz : {0, stepZ != 0 ? stepZ : 0}) {
-                int nz = (iz + dz + gridResolution) % gridResolution;
-
+                int nx, ny, nz;
+                if (periodicDistance == true) {
+                    nx = (ix + dx + gridResolution) % gridResolution;
+                    ny = (iy + dy + gridResolution) % gridResolution;
+                    nz = (iz + dz + gridResolution) % gridResolution;
+                }
+                else {
+                    nx = ix + dx;
+                    ny = iy + dy;
+                    nz = iz + dz;
+                    if (nx < 0 || ny < 0 || nz < 0 ||
+                        nx >= gridResolution || ny >= gridResolution || nz >= gridResolution) {
+                        continue;
+                    }
+                }
+                
                 int neighborCell = gridIndex3Dto1D(nx, ny, nz, gridResolution);
                 int start = gridCellStartIndices[neighborCell];
                 int end = gridCellEndIndices[neighborCell];
@@ -520,19 +534,27 @@ __global__ void kernUpdateVelNeighborSearchScattered(
                     glm::vec3 otherPos = pos[otherIdx];
                     glm::vec3 otherVel = vel1[otherIdx];
 
-                    glm::vec3 offset = computeOffsetWrapped(selfPos, otherPos, gridResolution, cellWidth);
-                    float distance = glm::length(offset);
+                    glm::vec3 offset;
+                    if (periodicDistance == true) {
+                        offset = computeOffsetWrapped(selfPos, otherPos, 2.f * scene_scale);
+                    }
+                    else {
+                        offset = (otherPos - selfPos);
+                    }
+                    
+                    float distance2 = glm::dot(offset, offset);
+
                     // Rule 1
-                    if (distance < rule1Distance) {
+                    if (distance2 < rule1Distance * rule1Distance) {
                         perceivedCenter += otherPos;
                         neighbors1++;
                     }
                     // Rule 2
-                    if (distance < rule2Distance) {
+                    if (distance2 < rule2Distance * rule2Distance) {
                         c -= offset;
                     }
                     // Rule 3
-                    if (distance < rule3Distance) {
+                    if (distance2 < rule3Distance * rule3Distance) {
                         perceivedVelocity += otherVel;
                         neighbors3++;
                     }
@@ -601,7 +623,7 @@ void Boids::stepSimulationNaive(float dt) {
     dev_vel1 = dev_vel2;
     dev_vel2 = temp;
 
-    cudaDeviceSynchronize();
+    //cudaDeviceSynchronize();
 }
 
 void Boids::stepSimulationScatteredGrid(float dt) {
