@@ -531,16 +531,43 @@ void Boids::stepSimulationScatteredGrid(float dt) {
   // In Parallel:
   // - label each particle with its array index as well as its grid index.
   //   Use 2x width grids.
-  kernComputeIndices << <blocks, blockSize >> > (N, gridSideCount, gridMinimum, gridInverseCellWidth,
-    dev_pos, dev_particleArrayIndices, dev_particleGridIndices);
-  // - Unstable key sort using Thrust. A stable sort isn't necessary, but you
+  dim3 blocksParticles((numObjects + blockSize - 1) / blockSize);
+  dim3 blocksCells((gridCellCount + blockSize - 1) / blockSize);
+  kernComputeIndices << <blocks, blockSize >> > (numObjects, gridSideCount, gridMinimum, 
+    gridInverseCellWidth, dev_pos, dev_particleArrayIndices, dev_particleGridIndices);
+  checkCUDAErrorWithLine("kernComputeIndices error");
+	// - Unstable key sort using Thrust. A stable sort isn't necessary, but you
   //   are welcome to do a performance comparison.
-  thrust::sort_by_key(dev_thrust_particleGridIndices, dev_thrust_particleGridIndices + N, dev_particleArrayIndices);
+  thrust::sort_by_key(dev_thrust_particleGridIndices, 
+    dev_thrust_particleGridIndices + numObjects, dev_particleArrayIndices);
+  checkCUDAErrorWithLine("Thrust sort by key failed");
+
+  kernResetIntBuffer << <blocksCells, blockSize >> > (gridCellCount, dev_gridCellStartIndices, -1);
+  kernResetIntBuffer << <blocksCells, blockSize >> > (gridCellCount, dev_gridCellEndIndices, -1);
+  checkCUDAErrorWithLine("kernResetIntBuffer error");
+
+  kernIdentifyCellStartEnd << <blocksParticles, blockSize >> > (numObjects, dev_particleGridIndices,
+    dev_gridCellStartIndices, dev_gridCellEndIndices);
+  checkCUDAErrorWithLine("kernIdentifyCellStartEnd error");
   // - Naively unroll the loop for finding the start and end indices of each
   //   cell's data pointers in the array of boid indices
   // - Perform velocity updates using neighbor search
   // - Update positions
+  kernUpdateVelNeighborSearchScattered << <blocksParticles, blockSize >> > (numObjects, gridSideCount,
+    gridMinimum, gridInverseCellWidth,
+    gridCellWidth, dev_gridCellStartIndices,
+    dev_gridCellEndIndices, dev_particleArrayIndices,
+    dev_pos, dev_vel1, dev_vel2
+    );
+  checkCUDAErrorWithLine("kernUpdateVelNeighborSearchScattered error");
   // - Ping-pong buffers as needed
+  glm::vec3* temp = dev_vel1;
+  dev_vel1 = dev_vel2;
+  dev_vel2 = temp;
+
+  kernUpdatePos << <blocksParticles, blockSize >> > (numObjects, dt, dev_pos, dev_vel1);
+  checkCUDAErrorWithLine("kernUpdatePos error");
+  cudaDeviceSynchronize();
 }
 
 void Boids::stepSimulationCoherentGrid(float dt) {
@@ -565,7 +592,10 @@ void Boids::endSimulation() {
   cudaFree(dev_vel1);
   cudaFree(dev_vel2);
   cudaFree(dev_pos);
-
+  cudaFree(dev_particleArrayIndices);
+  cudaFree(dev_particleGridIndices);
+  cudaFree(dev_gridCellStartIndices);
+  cudaFree(dev_gridCellEndIndices);
   // TODO-2.1 TODO-2.3 - Free any additional buffers here.
 }
 
