@@ -350,22 +350,21 @@ __device__ int gridIndex3Dto1D(int x, int y, int z, int gridResolution) {
 __global__ void kernComputeIndices(int N, int gridResolution,
   glm::vec3 gridMin, float inverseCellWidth,
   glm::vec3 *pos, int *indices, int *gridIndices) {
-    // TODO-2.1
-    // - Label each boid with the index of its grid cell.
-    // - Set up a parallel array of integer indices as pointers to the actual
-    //   boid data in pos and vel1/vel2
-    int index = (blockIdx.x * blockDim.x) + threadIdx.x;
-    for (int i = 0; i < N; i++)
-    {
-        indices[index] = N;
-        //Compute which grid cell boid is in.
-        int gridIndexX = (int)((pos[index].x - gridMin.x) * inverseCellWidth);
-        int gridIndexY = (int)((pos[index].y - gridMin.y) * inverseCellWidth);
-        int gridIndexZ = (int)((pos[index].z - gridMin.z) * inverseCellWidth);
+  // TODO-2.1
+  // - Label each boid with the index of its grid cell.
+  // - Set up a parallel array of integer indices as pointers to the actual
+  //   boid data in pos and vel1/vel2
+  int index = (blockIdx.x * blockDim.x) + threadIdx.x;
 
-        int gridIndex = gridIndexX + gridIndexY * gridResolution + gridIndexZ * gridResolution * gridResolution;
-        gridIndices[index] = gridIndex;
-    }
+  indices[index] = index;
+  //Compute which grid cell boid is in.
+  int gridIndexX = (int)((pos[index].x - gridMin.x) * inverseCellWidth);
+  int gridIndexY = (int)((pos[index].y - gridMin.y) * inverseCellWidth);
+  int gridIndexZ = (int)((pos[index].z - gridMin.z) * inverseCellWidth);
+
+  int gridIndex = gridIndexX + gridIndexY * gridResolution + gridIndexZ * gridResolution * gridResolution;
+  gridIndices[index] = gridIndex;
+    
 }
 
 // LOOK-2.1 Consider how this could be useful for indicating that a cell
@@ -379,10 +378,35 @@ __global__ void kernResetIntBuffer(int N, int *intBuffer, int value) {
 
 __global__ void kernIdentifyCellStartEnd(int N, int *particleGridIndices,
   int *gridCellStartIndices, int *gridCellEndIndices) {
+    
   // TODO-2.1
   // Identify the start point of each cell in the gridIndices array.
   // This is basically a parallel unrolling of a loop that goes
   // "this index doesn't match the one before it, must be a new cell!"
+  int index = (blockIdx.x * blockDim.x) + threadIdx.x;
+  if (index == 0)
+  {
+    gridCellStartIndices[particleGridIndices[index]] = 0;
+  }
+  else
+  {
+    if (particleGridIndices[index] != particleGridIndices[index - 1])
+    {
+      gridCellStartIndices[particleGridIndices[index]] = index;
+    }
+  }
+  if (index == N - 1)
+  {
+    gridCellEndIndices[particleGridIndices[index]] = N - 1;
+  }
+  else
+  {
+    if (particleGridIndices[index] != particleGridIndices[index + 1])
+    {
+      gridCellEndIndices[particleGridIndices[index]] = index;
+    }
+  }
+  
 }
 
 __global__ void kernUpdateVelNeighborSearchScattered(
@@ -399,6 +423,14 @@ __global__ void kernUpdateVelNeighborSearchScattered(
   // - Access each boid in the cell and compute velocity change from
   //   the boids rules, if this boid is within the neighborhood distance.
   // - Clamp the speed change before putting the new speed in vel2
+  int index = (blockIdx.x * blockDim.x) + threadIdx.x;
+  int gridIndexX = (int)((pos[index].x - gridMin.x) * inverseCellWidth);
+  int gridIndexY = (int)((pos[index].y - gridMin.y) * inverseCellWidth);
+  int gridIndexZ = (int)((pos[index].z - gridMin.z) * inverseCellWidth);
+
+  int gridIndex = gridIndexX + gridIndexY * gridResolution + gridIndexZ * gridResolution * gridResolution;
+
+  
 }
 
 __global__ void kernUpdateVelNeighborSearchCoherent(
