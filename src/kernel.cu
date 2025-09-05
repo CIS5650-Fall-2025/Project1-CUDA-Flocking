@@ -162,6 +162,7 @@ void Boids::initSimulation(int N) {
   cudaMalloc((void**)&dev_vel2, N * sizeof(glm::vec3));
   checkCUDAErrorWithLine("cudaMalloc dev_vel2 failed!");
 
+
   // LOOK-1.2 - This is a typical CUDA kernel invocation.
   kernGenerateRandomPosArray<<<fullBlocksPerGrid, blockSize>>>(1, numObjects,
     dev_pos, scene_scale);
@@ -343,9 +344,9 @@ __global__ void kernComputeIndices(int N, int gridResolution,
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i >= N) return;
   glm::vec3 rel = (pos[i] - gridMin) * inverseCellWidth;
-  int grid_x = max(0, min(gridResolution - 1, int(floorf(rel.x))));
-  int grid_y = max(0, min(gridResolution - 1, int(floorf(rel.y))));
-  int grid_z = max(0, min(gridResolution - 1, int(floorf(rel.z))));
+  int grid_x = imax(0, imin(gridResolution - 1, int(floorf(rel.x))));
+  int grid_y = imax(0, imin(gridResolution - 1, int(floorf(rel.y))));
+  int grid_z = imax(0, imin(gridResolution - 1, int(floorf(rel.z))));
   int cell = gridIndex3Dto1D(grid_x, grid_y, grid_z, gridResolution);
   gridIndices[i] = cell;
   // - Set up a parallel array of integer indices as pointers to the actual
@@ -447,7 +448,7 @@ __global__ void kernUpdateVelNeighborSearchScattered(
 
         for (int k = start; k <= end; k++) {
           int j = particleArrayIndices[k];
-          if (j == i) continue;
+          if (j == boidIdx) continue;
 
           glm::vec3 d = pos[j] - p;
           float dist = glm::length(d);
@@ -479,11 +480,11 @@ __global__ void kernUpdateVelNeighborSearchScattered(
     deltaV += averageV * rule3Scale;
   }
   // - Clamp the speed change before putting the new speed in vel2
-  glm::vec3 v = vel1[i] + dv;
+  glm::vec3 v = vel1[boidIdx] + deltaV;
   float s = glm::length(v);
   if (s > maxSpeed) v = (v / s) * maxSpeed;
 
-  vel2[i] = v;
+  vel2[boidIdx] = v;
 }
 
 __global__ void kernUpdateVelNeighborSearchCoherent(
@@ -533,26 +534,28 @@ void Boids::stepSimulationScatteredGrid(float dt) {
   //   Use 2x width grids.
   dim3 blocksParticles((numObjects + blockSize - 1) / blockSize);
   dim3 blocksCells((gridCellCount + blockSize - 1) / blockSize);
-  kernComputeIndices << <blocks, blockSize >> > (numObjects, gridSideCount, gridMinimum, 
+
+  // Label boids' array and grid indices
+  kernComputeIndices << <blocksParticles, blockSize >> > (numObjects, gridSideCount, gridMinimum, 
     gridInverseCellWidth, dev_pos, dev_particleArrayIndices, dev_particleGridIndices);
   checkCUDAErrorWithLine("kernComputeIndices error");
-	// - Unstable key sort using Thrust. A stable sort isn't necessary, but you
-  //   are welcome to do a performance comparison.
+	
+  //Sort by key using thrust
   thrust::sort_by_key(dev_thrust_particleGridIndices, 
     dev_thrust_particleGridIndices + numObjects, dev_particleArrayIndices);
   checkCUDAErrorWithLine("Thrust sort by key failed");
 
+  //Reset start and end buffers to -1
   kernResetIntBuffer << <blocksCells, blockSize >> > (gridCellCount, dev_gridCellStartIndices, -1);
   kernResetIntBuffer << <blocksCells, blockSize >> > (gridCellCount, dev_gridCellEndIndices, -1);
   checkCUDAErrorWithLine("kernResetIntBuffer error");
 
+  //Identify cell ranges
   kernIdentifyCellStartEnd << <blocksParticles, blockSize >> > (numObjects, dev_particleGridIndices,
     dev_gridCellStartIndices, dev_gridCellEndIndices);
   checkCUDAErrorWithLine("kernIdentifyCellStartEnd error");
-  // - Naively unroll the loop for finding the start and end indices of each
-  //   cell's data pointers in the array of boid indices
-  // - Perform velocity updates using neighbor search
-  // - Update positions
+
+  //Neighbour search, update velocities
   kernUpdateVelNeighborSearchScattered << <blocksParticles, blockSize >> > (numObjects, gridSideCount,
     gridMinimum, gridInverseCellWidth,
     gridCellWidth, dev_gridCellStartIndices,
@@ -560,11 +563,13 @@ void Boids::stepSimulationScatteredGrid(float dt) {
     dev_pos, dev_vel1, dev_vel2
     );
   checkCUDAErrorWithLine("kernUpdateVelNeighborSearchScattered error");
-  // - Ping-pong buffers as needed
+  
+  //Ping pong buffers to put new vels in vel1
   glm::vec3* temp = dev_vel1;
   dev_vel1 = dev_vel2;
   dev_vel2 = temp;
 
+  //Update positions
   kernUpdatePos << <blocksParticles, blockSize >> > (numObjects, dt, dev_pos, dev_vel1);
   checkCUDAErrorWithLine("kernUpdatePos error");
   cudaDeviceSynchronize();
