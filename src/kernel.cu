@@ -730,12 +730,9 @@ void Boids::stepSimulationCoherentGrid(float dt) {
 
   //Neighbour search, update velocities
   kernUpdateVelNeighborSearchCoherent << <blocksParticles, blockSize >> > (
-    numObjects, gridSideCount,
-    gridMinimum, gridInverseCellWidth,
-    gridCellWidth, dev_gridCellStartIndices,
-    dev_gridCellEndIndices,
-    dev_pos, dev_vel1, dev_vel2
-    );
+    numObjects, gridSideCount, gridMinimum, gridInverseCellWidth, gridCellWidth,
+    dev_gridCellStartIndices, dev_gridCellEndIndices,
+    dev_posCoherent, dev_vel1Coherent, dev_vel2Coherent);
   checkCUDAErrorWithLine("kernUpdateVelNeighborSearchCoherent error");
 
   //Ping pong buffers (coherent)
