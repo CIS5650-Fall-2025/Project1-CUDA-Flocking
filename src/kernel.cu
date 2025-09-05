@@ -460,6 +460,7 @@ __global__ void kernUpdateVelNeighborSearchScattered(
     int neighbors3 = 0;
 
 
+    glm::vec3 posVal = pos[index]; // I hope I'm doing this right because realized probably better if it's set up this way but I'm not on a computer that can run this right now; not going to rerun all my tests anyway
 
     for (int z = minCell.z; z <= maxCell.z; ++z) {
         for (int y = minCell.y; y <= maxCell.y; ++y) {
@@ -472,16 +473,17 @@ __global__ void kernUpdateVelNeighborSearchScattered(
                 for (int i = startIndex; i <= endIndex; ++i) {
                     int otherIndex = particleArrayIndices[i];
                     if (otherIndex != index) {
-                        float dist = glm::length(pos[otherIndex] - pos[index]);
+                        glm::vec3 posOther = pos[otherIndex];
+                        float dist = glm::length(posOther - posVal);
                         // Rule 1: boids fly towards their local perceived center of mass, which excludes themselves
                         if (dist < rule1Distance) {
-                            perceivedCenter += pos[otherIndex];
+                            perceivedCenter += posOther;
                             ++neighbors1;
 
                         }
                         // Rule 2: boids try to stay a distance d away from each other
                         if (dist < rule2Distance) {
-                            c -= pos[otherIndex] - pos[index];
+                            c -= posOther - posVal;
                         }
                         // Rule 3: boids try to match the speed of surrounding boids
                         if (dist < rule3Distance) {
@@ -562,6 +564,7 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
     glm::vec3 perceivedVelocity = glm::vec3(0.f);
     int neighbors3 = 0;
 
+    glm::vec3 posVal = pos[index]; // Again hope this is actually right and an improvement
 
 
     for (int z = minCell.z; z <= maxCell.z; ++z) {
@@ -574,16 +577,17 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
                 //   the boids rules, if this boid is within the neighborhood distance.
                 for (int otherIndex = startIndex; otherIndex <= endIndex; ++otherIndex) {
                     if (otherIndex != index) {
-                        float dist = glm::length(pos[otherIndex] - pos[index]);
+                        glm::vec3 posOther = pos[otherIndex];
+                        float dist = glm::length(posOther - posVal);
                         // Rule 1: boids fly towards their local perceived center of mass, which excludes themselves
                         if (dist < rule1Distance) {
-                            perceivedCenter += pos[otherIndex];
+                            perceivedCenter += posOther;
                             ++neighbors1;
 
                         }
                         // Rule 2: boids try to stay a distance d away from each other
                         if (dist < rule2Distance) {
-                            c -= pos[otherIndex] - pos[index];
+                            c -= posOther - posVal;
                         }
                         // Rule 3: boids try to match the speed of surrounding boids
                         if (dist < rule3Distance) {
