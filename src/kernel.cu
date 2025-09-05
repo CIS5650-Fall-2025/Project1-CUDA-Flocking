@@ -699,6 +699,70 @@ void Boids::stepSimulationCoherentGrid(float dt) {
   // - Perform velocity updates using neighbor search
   // - Update positions
   // - Ping-pong buffers as needed. THIS MAY BE DIFFERENT FROM BEFORE.
+  dim3 blocksParticles((numObjects + blockSize - 1) / blockSize);
+  dim3 blocksCells((gridCellCount + blockSize - 1) / blockSize);
+
+  // Label boids' array and grid indices
+  kernComputeIndices << <blocksParticles, blockSize >> > (numObjects, gridSideCount, gridMinimum,
+    gridInverseCellWidth, dev_pos, dev_particleArrayIndices, dev_particleGridIndices);
+  checkCUDAErrorWithLine("kernComputeIndices error");
+
+  //Sort by key using thrust
+  thrust::sort_by_key(dev_thrust_particleGridIndices,
+    dev_thrust_particleGridIndices + numObjects, dev_particleArrayIndices);
+  checkCUDAErrorWithLine("Thrust sort by key failed");
+
+  //Reset start and end buffers to -1
+  kernResetIntBuffer << <blocksCells, blockSize >> > (gridCellCount, dev_gridCellStartIndices, -1);
+  kernResetIntBuffer << <blocksCells, blockSize >> > (gridCellCount, dev_gridCellEndIndices, -1);
+  checkCUDAErrorWithLine("kernResetIntBuffer error");
+
+  //Identify cell ranges
+  kernIdentifyCellStartEnd << <blocksParticles, blockSize >> > (numObjects, dev_particleGridIndices,
+    dev_gridCellStartIndices, dev_gridCellEndIndices);
+  checkCUDAErrorWithLine("kernIdentifyCellStartEnd error");
+
+  //Reorder pos and vel1 to coherent arrays
+  kernReorderCoherent << <blocksParticles, blockSize >> > (
+    numObjects, dev_particleArrayIndices, dev_pos, dev_vel1,
+    dev_posCoherent, dev_vel1Coherent);
+  checkCUDAErrorWithLine("reorder coherent");
+
+  //Neighbour search, update velocities
+  kernUpdateVelNeighborSearchCoherent << <blocksParticles, blockSize >> > (
+    numObjects, gridSideCount,
+    gridMinimum, gridInverseCellWidth,
+    gridCellWidth, dev_gridCellStartIndices,
+    dev_gridCellEndIndices,
+    dev_pos, dev_vel1, dev_vel2
+    );
+  checkCUDAErrorWithLine("kernUpdateVelNeighborSearchCoherent error");
+
+  //Ping pong buffers (coherent)
+  glm::vec3* temp = dev_vel1Coherent;
+	dev_vel1Coherent = dev_vel2Coherent;
+	dev_vel2Coherent = temp;
+
+  //Update positions
+  kernUpdatePos << <blocksParticles, blockSize >> > (numObjects, dt, dev_posCoherent, dev_vel1Coherent);
+  checkCUDAErrorWithLine("kernUpdatePosCoherent error");
+
+  //Publish coherent arrays as the live arrays for next frame
+  glm::vec3* tmp;
+
+  tmp = dev_pos;
+	dev_pos = dev_posCoherent;
+	dev_posCoherent = tmp;
+
+  tmp = dev_vel1;
+	dev_vel1 = dev_vel1Coherent;
+	dev_vel1Coherent = tmp;
+
+  tmp = dev_vel2;
+	dev_vel2 = dev_vel2Coherent;
+	dev_vel2Coherent = tmp;
+
+  cudaDeviceSynchronize();
 }
 
 void Boids::endSimulation() {
