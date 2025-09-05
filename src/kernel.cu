@@ -640,10 +640,10 @@ void Boids::stepSimulationScatteredGrid(float dt) {
     kernComputeIndices<<<fullBlocksPerGrid, blockSize>>>(numObjects, gridSideCount, gridMinimum, gridInverseCellWidth, dev_pos, dev_particleArrayIndices, dev_particleGridIndices);
   // - Unstable key sort using Thrust. A stable sort isn't necessary, but you
   //   are welcome to do a performance comparison.
-    dev_thrust_particleArrayIndices = thrust::device_ptr<int>(dev_particleGridIndices);
-    dev_thrust_particleGridIndices = thrust::device_ptr<int>(dev_particleArrayIndices);
+    dev_thrust_particleGridIndices = thrust::device_ptr<int>(dev_particleGridIndices);
+    dev_thrust_particleArrayIndices = thrust::device_ptr<int>(dev_particleArrayIndices);
     // LOOK-2.1 Example for using thrust::sort_by_key
-    thrust::sort_by_key(dev_thrust_particleArrayIndices, dev_thrust_particleArrayIndices + numObjects, dev_thrust_particleGridIndices);
+    thrust::sort_by_key(dev_thrust_particleGridIndices, dev_thrust_particleGridIndices + numObjects, dev_thrust_particleArrayIndices);
 
   // - Naively unroll the loop for finding the start and end indices of each
   //   cell's data pointers in the array of boid indices
@@ -704,10 +704,10 @@ void Boids::stepSimulationCoherentGrid(float dt) {
     kernComputeIndices << <fullBlocksPerGrid, blockSize >> > (numObjects, gridSideCount, gridMinimum, gridInverseCellWidth, dev_pos, dev_particleArrayIndices, dev_particleGridIndices);
     // - Unstable key sort using Thrust. A stable sort isn't necessary, but you
     //   are welcome to do a performance comparison.
-    dev_thrust_particleArrayIndices = thrust::device_ptr<int>(dev_particleGridIndices);
-    dev_thrust_particleGridIndices = thrust::device_ptr<int>(dev_particleArrayIndices);
+    dev_thrust_particleGridIndices = thrust::device_ptr<int>(dev_particleGridIndices);
+    dev_thrust_particleArrayIndices = thrust::device_ptr<int>(dev_particleArrayIndices);
     // LOOK-2.1 Example for using thrust::sort_by_key
-    thrust::sort_by_key(dev_thrust_particleArrayIndices, dev_thrust_particleArrayIndices + numObjects, dev_thrust_particleGridIndices);
+    thrust::sort_by_key(dev_thrust_particleGridIndices, dev_thrust_particleGridIndices + numObjects, dev_thrust_particleArrayIndices);
 
     // - Naively unroll the loop for finding the start and end indices of each
     //   cell's data pointers in the array of boid indices
