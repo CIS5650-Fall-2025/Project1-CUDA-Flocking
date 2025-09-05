@@ -183,6 +183,11 @@ void Boids::initSimulation(int N) {
   gridMinimum.z -= halfGridWidth;
 
   // TODO-2.1 TODO-2.3 - Allocate additional buffers here.
+  cudaMalloc((void**)&dev_particleArrayIndices, N * sizeof(int));
+  cudaMalloc((void**)&dev_particleGridIndices, N * sizeof(int));
+  cudaMalloc((void**)&dev_gridCellStartIndices, gridCellCount * sizeof(int));
+  cudaMalloc((void**)&dev_gridCellEndIndices, gridCellCount * sizeof(int));
+
   cudaDeviceSynchronize();
 }
 
@@ -408,7 +413,54 @@ __global__ void kernIdentifyCellStartEnd(int N, int *particleGridIndices,
   }
   
 }
+__device__ glm::vec3 computeVelocityChangeScattered(int N, int startIndex, int endIndex, int iSelf, const glm::vec3* pos, const glm::vec3* vel) {
+    glm::vec3 changedVelocity = vel[iSelf];
 
+    glm::vec3 percievedCenter = glm::vec3(0.0f, 0.0f, 0.0f);
+    glm::vec3 c = glm::vec3(0.0f, 0.0f, 0.0f);
+    glm::vec3 percievedVelocity = glm::vec3(0.0f, 0.0f, 0.0f);
+    glm::vec3 curPos = pos[iSelf];
+    int rule1Neighbors = 0;
+    int rule3Neighbors = 0;
+    for (int i = startIndex; i <= endIndex; i++)
+    {
+        if (i != iSelf)
+        {
+            // Rule 1: boids fly towards their local perceived center of mass, which excludes themselves
+            if (glm::distance(pos[i], pos[iSelf]) < rule1Distance)
+            {
+                rule1Neighbors++;
+                percievedCenter += pos[i];
+            }
+            // Rule 2: boids try to stay a distance d away from each other
+            if (glm::distance(pos[i], pos[iSelf]) < rule2Distance)
+            {
+                c -= pos[i] - pos[iSelf];
+            }
+            // Rule 3: boids try to match the speed of surrounding boids
+            if (glm::distance(pos[i], pos[iSelf]) < rule3Distance)
+            {
+                rule3Neighbors++;
+                percievedVelocity += vel[i];
+            }
+        }
+    }
+
+    if (rule1Neighbors != 0)
+    {
+        percievedCenter /= rule1Neighbors;
+        glm::vec3 rule1VelChange = (percievedCenter - pos[iSelf]) * rule1Scale;
+        changedVelocity += (percievedCenter - pos[iSelf]) * rule1Scale;
+    }
+    changedVelocity += c * rule2Scale;
+    if (rule3Neighbors != 0)
+    {
+        percievedVelocity /= rule3Neighbors;
+        changedVelocity += percievedVelocity * rule3Scale;
+    }
+    return changedVelocity;
+
+}
 __global__ void kernUpdateVelNeighborSearchScattered(
   int N, int gridResolution, glm::vec3 gridMin,
   float inverseCellWidth, float cellWidth,
@@ -424,12 +476,21 @@ __global__ void kernUpdateVelNeighborSearchScattered(
   //   the boids rules, if this boid is within the neighborhood distance.
   // - Clamp the speed change before putting the new speed in vel2
   int index = (blockIdx.x * blockDim.x) + threadIdx.x;
+
   int gridIndexX = (int)((pos[index].x - gridMin.x) * inverseCellWidth);
   int gridIndexY = (int)((pos[index].y - gridMin.y) * inverseCellWidth);
   int gridIndexZ = (int)((pos[index].z - gridMin.z) * inverseCellWidth);
 
   int gridIndex = gridIndexX + gridIndexY * gridResolution + gridIndexZ * gridResolution * gridResolution;
 
+  int startIndex = gridCellStartIndices[gridIndex];
+  int endIndex = dev_gridCellEndIndices[gridIndex];
+  if (startIndex != -1)
+  {
+    glm::vec3 changedVel = computeVelocityChangeScattered(N, startIndex, endIndex, index, pos, vel1);
+    changedVel = glm::clamp(changedVel, -maxSpeed, maxSpeed);
+    vel2[index] = changedVel;
+  }
   
 }
 
@@ -486,6 +547,13 @@ void Boids::stepSimulationScatteredGrid(float dt) {
   // - Perform velocity updates using neighbor search
   // - Update positions
   // - Ping-pong buffers as needed
+
+  
+  dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
+  dim3 fullBlocksPerGridCell((gridCellCount + blockSize - 1) / blockSize);
+  kernComputeIndices <<<fullBlocksPerGrid, threadsPerBlock>>>(numObjects, gridSideCount, gridMinimum, gridInverseCellWidth, dev_pos, dev_particleArrayIndices, dev_particleGridIndices);
+  kernResetIntBuffer<<< fullBlocksPerGridCell, threadsPerBlock>>>
+  
 }
 
 void Boids::stepSimulationCoherentGrid(float dt) {
