@@ -400,11 +400,90 @@ __global__ void kernUpdateVelNeighborSearchScattered(
   // TODO-2.1 - Update a boid's velocity using the uniform grid to reduce
   // the number of boids that need to be checked.
   // - Identify the grid cell that this particle is in
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i >= N) return;
+
+  int boidIdx = particleArrayIndices[i];
+  glm::vec3 p = pos[boidIdx];
+
+  glm::vec3 rel = (p - gridMin) * inverseCellWidth;
+  int grid_x = imax(0, imin(gridResolution - 1, int(floorf(rel.x))));
+  int grid_y = imax(0, imin(gridResolution - 1, int(floorf(rel.y))));
+  int grid_z = imax(0, imin(gridResolution - 1, int(floorf(rel.z))));
+
+  float frac_x = rel.x - floorf(rel.x);
+  float frac_y = rel.y - floorf(rel.y);
+  float frac_z = rel.z - floorf(rel.z);
+
   // - Identify which cells may contain neighbors. This isn't always 8.
+  int nx = grid_x + ((frac_x >= 0.5f) ? 1 : -1);
+  int ny = grid_y + ((frac_y >= 0.5f) ? 1 : -1);
+  int nz = grid_z + ((frac_z >= 0.5f) ? 1 : -1);
+  nx = imax(0, imin(gridResolution - 1, nx));
+  ny = imax(0, imin(gridResolution - 1, ny));
+  nz = imax(0, imin(gridResolution - 1, nz));
+
+  int xs[2] = { grid_x, nx };
+  int ys[2] = { grid_y, ny};
+  int zs[2] = { grid_z, nz};
+	//check for duplicates
+  int xCount = (nx == grid_x) ? 1 : 2;
+  int yCount = (ny == grid_y) ? 1 : 2;
+  int zCount = (nz == grid_z) ? 1 : 2;
+
+  glm::vec3 centre(0), separation(0), averageV(0);
+  int count1 = 0, count3 = 0;
+
   // - For each cell, read the start/end indices in the boid pointer array.
-  // - Access each boid in the cell and compute velocity change from
+  for (int x = 0; x < xCount; x++) {
+    for (int y = 0; y < yCount; y++) {
+	    for (int z = 0; z < zCount; z++) {
+        int cx = xs[x], cy = ys[y], cz = zs[z];
+        int cell = gridIndex3Dto1D(cx, cy, cz, gridResolution);
+
+        int start = gridCellStartIndices[cell];
+        if (start == -1) continue;
+        int end = gridCellEndIndices[cell];
+
+        for (int k = start; k <= end; k++) {
+          int j = particleArrayIndices[k];
+          if (j == i) continue;
+
+          glm::vec3 d = pos[j] - p;
+          float dist = glm::length(d);
+
+          if (dist < rule1Distance) {
+            centre += pos[j];
+            count1++;
+          }
+          if (dist < rule2Distance) {
+            separation -= d;
+          }
+          if (dist < rule3Distance) {
+            averageV += vel1[j];
+            count3++;
+          }
+        }
+	    }
+    }
+  }// - Access each boid in the cell and compute velocity change from
   //   the boids rules, if this boid is within the neighborhood distance.
+  glm::vec3 deltaV(0);
+  if (count1 > 0) {
+    centre /= (float)count1;
+    deltaV += (centre - p) * rule1Scale;
+  }
+  deltaV += separation * rule2Scale;
+  if (count3 > 0) {
+    averageV /= (float)count3;
+    deltaV += averageV * rule3Scale;
+  }
   // - Clamp the speed change before putting the new speed in vel2
+  glm::vec3 v = vel1[i] + dv;
+  float s = glm::length(v);
+  if (s > maxSpeed) v = (v / s) * maxSpeed;
+
+  vel2[i] = v;
 }
 
 __global__ void kernUpdateVelNeighborSearchCoherent(
