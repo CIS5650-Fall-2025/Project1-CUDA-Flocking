@@ -259,6 +259,18 @@ __device__ glm::vec3 computeOffsetWrapped(glm::vec3 a, glm::vec3 b, float domain
     return offset;
 }
 
+// Identical CPU Version
+glm::vec3 computeOffsetWrappedCPU(glm::vec3 a, glm::vec3 b, float domainWidth) {
+    glm::vec3 domain(domainWidth);
+    glm::vec3 offset = b - a;
+
+    offset.x -= roundf(offset.x / domainWidth) * domainWidth;
+    offset.y -= roundf(offset.y / domainWidth) * domainWidth;
+    offset.z -= roundf(offset.z / domainWidth) * domainWidth;
+
+    return offset;
+}
+
 /**
 * LOOK-1.2 You can use this as a helper for kernUpdateVelocityBruteForce.
 * __device__ code can be called from a __global__ context
@@ -332,7 +344,68 @@ __device__ glm::vec3 computeVelocityChange(int N, int iSelf, const glm::vec3 *po
     return v1 + v2 + v3;
 }
 
+// Identical CPU Version
+glm::vec3 computeVelocityChangeCPU(int N, int iSelf,
+    const glm::vec3* pos,
+    const glm::vec3* vel) {
+    glm::vec3 selfPos = pos[iSelf];
+    glm::vec3 selfVel = vel[iSelf];
 
+    glm::vec3 perceivedCenter(0.f);
+    glm::vec3 c(0.f);
+    glm::vec3 perceivedVelocity(0.f);
+
+    int neighbors1 = 0;
+    int neighbors3 = 0;
+
+    for (int i = 0; i < N; i++) {
+        if (i == iSelf) continue;
+
+        glm::vec3 offset;
+        if (periodicDistance == true) {
+            offset = computeOffsetWrappedCPU(selfPos, pos[i], 2.f * scene_scale);
+        }
+        else {
+            offset = pos[i] - selfPos;
+        }
+        float distance2 = glm::dot(offset, offset);
+
+        // Rule 1
+        if (distance2 < rule1Distance * rule1Distance) {
+            perceivedCenter += pos[i];
+            neighbors1++;
+        }
+
+        // Rule 2
+        if (distance2 < rule2Distance * rule2Distance) {
+            c -= offset;
+        }
+
+        // Rule 3
+        if (distance2 < rule3Distance * rule3Distance) {
+            perceivedVelocity += vel[i];
+            neighbors3++;
+        }
+    }
+
+    glm::vec3 v1(0.f), v2(0.f), v3(0.f);
+    // Rule 1
+    if (neighbors1 > 0) {
+        perceivedCenter /= (float)neighbors1;
+        v1 = (perceivedCenter - selfPos) * rule1Scale;
+    }
+
+    // Rule 2
+    v2 = c * rule2Scale;
+
+    // Rule 3
+    if (neighbors3 > 0) {
+        perceivedVelocity /= (float)neighbors3;
+        v3 = perceivedVelocity * rule3Scale;
+    }
+
+    return v1 + v2 + v3;
+}
 
 /**
 * TODO-1.2 implement basic flocking
@@ -624,6 +697,41 @@ void Boids::stepSimulationNaive(float dt) {
     dev_vel2 = temp;
 
     //cudaDeviceSynchronize();
+}
+
+void Boids::stepSimulationCPU(float dt) {
+    std::vector<glm::vec3> h_pos(numObjects);
+    std::vector<glm::vec3> h_vel(numObjects);
+
+    cudaMemcpy(h_pos.data(), dev_pos, numObjects * sizeof(glm::vec3), cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_vel.data(), dev_vel1, numObjects * sizeof(glm::vec3), cudaMemcpyDeviceToHost);
+
+    std::vector<glm::vec3> h_newVel(numObjects);
+
+    for (int i = 0; i < numObjects; i++) {
+        glm::vec3 velDelta = computeVelocityChangeCPU(numObjects, i, h_pos.data(), h_vel.data());
+        glm::vec3 velNew = h_vel[i] + velDelta;
+
+        float speed = glm::length(velNew);
+        if (speed > maxSpeed) {
+            velNew = (velNew / speed) * maxSpeed;
+        }
+        h_newVel[i] = velNew;
+    }
+
+    for (int i = 0; i < numObjects; i++) {
+        h_pos[i] += h_newVel[i] * dt;
+
+        if (h_pos[i].x < -scene_scale) h_pos[i].x = scene_scale;
+        if (h_pos[i].y < -scene_scale) h_pos[i].y = scene_scale;
+        if (h_pos[i].z < -scene_scale) h_pos[i].z = scene_scale;
+        if (h_pos[i].x > scene_scale) h_pos[i].x = -scene_scale;
+        if (h_pos[i].y > scene_scale) h_pos[i].y = -scene_scale;
+        if (h_pos[i].z > scene_scale) h_pos[i].z = -scene_scale;
+    }
+
+    cudaMemcpy(dev_pos, h_pos.data(), numObjects * sizeof(glm::vec3), cudaMemcpyHostToDevice);
+    cudaMemcpy(dev_vel1, h_newVel.data(), numObjects * sizeof(glm::vec3), cudaMemcpyHostToDevice);
 }
 
 void Boids::stepSimulationScatteredGrid(float dt) {
