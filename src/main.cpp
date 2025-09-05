@@ -10,6 +10,7 @@
 #include "kernel.h"
 
 #include <iostream>
+#include <fstream>
 #include <memory>
 #include <sstream>
 
@@ -22,14 +23,21 @@
 // ================
 
 // LOOK-2.1 LOOK-2.3 - toggles for UNIFORM_GRID and COHERENT_GRID
-#define VISUALIZE 1
-#define UNIFORM_GRID 1
-#define COHERENT_GRID 1
-#define SHARED_MEMORY 1
+#define VISUALIZE 0
+#define UNIFORM_GRID 0
+#define COHERENT_GRID 0
+#define SHARED_MEMORY 0
 
 // LOOK-1.2 - change this to adjust particle count in the simulation
-const int N_FOR_VIS = 100000;
+const int N_FOR_VIS = 10000;
 const float DT = 0.2f;
+
+// PROFILE LOGS
+#define PROFILE_LOGS 1
+#define PROFILE_LOGNAME "../data/blocksize_naive.txt"
+#define PROFILE_FOREMSG "128"
+
+std::ofstream* filePtr = nullptr;
 
 /**
 * C main function.
@@ -38,7 +46,15 @@ int main(int argc, char* argv[]) {
 	projectName = "5650 CUDA Intro: Boids";
 
 	if (init(argc, argv)) {
+
+#if PROFILE_LOGS
+		std::ofstream file(PROFILE_LOGNAME, std::ios::out | std::ios::app);
+		filePtr = &file;
+#endif
 		mainLoop();
+#if PROFILE_LOGS
+		file.close();
+#endif
 		Boids::endSimulation();
 		return 0;
 	}
@@ -232,6 +248,46 @@ void mainLoop() {
 	double timebase = 0;
 	int frame = 0;
 
+#if PROFILE_LOGS
+	bool shouldClose = false;
+	float baseBaseTime = glfwGetTime();
+	float totalFrame = 0;
+
+	while (!glfwWindowShouldClose(window)) {
+		glfwPollEvents();
+
+		frame++;
+		totalFrame++;
+		double time = glfwGetTime();
+		bool shouldDrawOverride = false;
+
+		if ((time - baseBaseTime) > 10.f) {
+			float avgFps = totalFrame / (time - baseBaseTime);
+			if (filePtr) {
+				(*filePtr) << PROFILE_FOREMSG << ", " << avgFps << "\n";
+			}
+			break;
+		}
+
+		if (time - timebase > 1.0) {
+			fps = frame / (time - timebase);
+			timebase = time;
+			frame = 0;
+			shouldDrawOverride = true;
+		}
+
+		runCUDA();
+
+		std::ostringstream ss;
+		ss << "[";
+		ss.precision(1);
+		ss << std::fixed << fps;
+		ss << " fps] " << deviceName;
+		glfwSetWindowTitle(window, ss.str().c_str());
+
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	}
+#else
 	Boids::unitTest(); // LOOK-1.2 We run some basic example code to make sure
 	// your CUDA development setup is ready to go.
 
@@ -287,6 +343,7 @@ void mainLoop() {
 		}
 #endif
 	}
+#endif
 	glfwDestroyWindow(window);
 	glfwTerminate();
 }
