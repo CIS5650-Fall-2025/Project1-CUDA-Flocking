@@ -85,6 +85,8 @@ glm::vec3 *dev_vel2;
 // LOOK-2.1 - these are NOT allocated for you. You'll have to set up the thrust
 // pointers on your own too.
 
+
+
 // For efficient sorting and the uniform grid. These should always be parallel.
 int *dev_particleArrayIndices; // What index in dev_pos and dev_velX represents this particle?
 int *dev_particleGridIndices; // What grid cell is this particle in?
@@ -304,8 +306,7 @@ __global__ void kernUpdateVelocityBruteForce(int N, glm::vec3 *pos,
       return;
   }
   glm::vec3 changedVel = computeVelocityChange(N, index, pos, vel1);
-  //Clamp
-  glm::clamp(changedVel, -maxSpeed, maxSpeed);
+  changedVel = glm::clamp(changedVel, -maxSpeed, maxSpeed);
   vel2[index] = changedVel;
 
 
@@ -353,6 +354,18 @@ __global__ void kernComputeIndices(int N, int gridResolution,
     // - Label each boid with the index of its grid cell.
     // - Set up a parallel array of integer indices as pointers to the actual
     //   boid data in pos and vel1/vel2
+    int index = (blockIdx.x * blockDim.x) + threadIdx.x;
+    for (int i = 0; i < N; i++)
+    {
+        indices[index] = N;
+        //Compute which grid cell boid is in.
+        int gridIndexX = (int)((pos[index].x - gridMin.x) * inverseCellWidth);
+        int gridIndexY = (int)((pos[index].y - gridMin.y) * inverseCellWidth);
+        int gridIndexZ = (int)((pos[index].z - gridMin.z) * inverseCellWidth);
+
+        int gridIndex = gridIndexX + gridIndexY * gridResolution + gridIndexZ * gridResolution * gridResolution;
+        gridIndices[index] = gridIndex;
+    }
 }
 
 // LOOK-2.1 Consider how this could be useful for indicating that a cell
@@ -418,8 +431,14 @@ void Boids::stepSimulationNaive(float dt) {
   kernUpdatePos<<<fullBlocksPerGrid, threadsPerBlock>>>(numObjects, dt, dev_pos, dev_vel2);
   checkCUDAErrorWithLine("kernal failure");
   // TODO-1.2 ping-pong the velocity buffers
-  cudaMemcpy(dev_vel2, dev_vel1, numObjects * sizeof(glm::vec3), cudaMemcpyDeviceToDevice);
-  checkCUDAErrorWithLine("memcpy failure");
+  // Unecessary copy, can just swap which vel we send for same effect
+  //cudaMemcpy(dev_vel1, dev_vel2, numObjects * sizeof(glm::vec3), cudaMemcpyDeviceToDevice);
+  
+  glm::vec3* tempVel = dev_vel2;
+  dev_vel2 = dev_vel1;
+  dev_vel1 = tempVel;
+  
+  
 }
 
 void Boids::stepSimulationScatteredGrid(float dt) {
