@@ -81,6 +81,12 @@ glm::vec3 *dev_pos;
 glm::vec3 *dev_vel1;
 glm::vec3 *dev_vel2;
 
+// Coherent (cell-sorted) copies
+glm::vec3 *dev_posCoherent;
+glm::vec3 *dev_vel1Coherent;
+glm::vec3 *dev_vel2Coherent;
+
+
 // LOOK-2.1 - these are NOT allocated for you. You'll have to set up the thrust
 // pointers on your own too.
 
@@ -187,6 +193,9 @@ void Boids::initSimulation(int N) {
   cudaMalloc(&dev_gridCellEndIndices, gridCellCount * sizeof(int));
   dev_thrust_particleGridIndices = thrust::device_ptr<int>(dev_particleGridIndices);
   dev_thrust_particleArrayIndices = thrust::device_ptr<int>(dev_particleArrayIndices);
+  cudaMalloc(&dev_posCoherent, N * sizeof(glm::vec3));
+  cudaMalloc(&dev_vel1Coherent, N * sizeof(glm::vec3));
+  cudaMalloc(&dev_vel2Coherent, N * sizeof(glm::vec3));
   cudaDeviceSynchronize();
 }
 
@@ -363,6 +372,18 @@ __global__ void kernResetIntBuffer(int N, int *intBuffer, int value) {
     intBuffer[index] = value;
   }
 }
+
+__global__ void kernReorderCoherent(int N, const int* particleArrayIndices,     
+  const glm::vec3* posIn, const glm::vec3* vel1In, glm::vec3* posOut, glm::vec3* vel1Out) {
+
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i >= N) return;
+
+  int src = particleArrayIndices[i];
+  posOut[i] = posIn[src];
+  vel1Out[i] = vel1In[src];
+}
+
 
 __global__ void kernIdentifyCellStartEnd(int N, int *particleGridIndices,
   int *gridCellStartIndices, int *gridCellEndIndices) {
@@ -601,6 +622,9 @@ void Boids::endSimulation() {
   cudaFree(dev_particleGridIndices);
   cudaFree(dev_gridCellStartIndices);
   cudaFree(dev_gridCellEndIndices);
+  cudaFree(dev_posCoherent);
+  cudaFree(dev_vel1Coherent);
+  cudaFree(dev_vel2Coherent);
   // TODO-2.1 TODO-2.3 - Free any additional buffers here.
 }
 
