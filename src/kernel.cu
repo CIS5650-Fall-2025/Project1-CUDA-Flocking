@@ -15,6 +15,7 @@
 #include <thrust/device_vector.h>
 
 #include <glm/glm.hpp>
+#include <device_launch_parameters.h>
 
 // LOOK-2.1 potentially useful for doing grid-based neighbor search
 #ifndef imax
@@ -60,7 +61,7 @@ void checkCUDAError(const char *msg, int line = -1) {
 #define rule3Scale 0.1f
 
 #define maxSpeed 1.0f
-
+ 
 /*! Size of the starting area in simulation space. */
 #define scene_scale 100.0f
 
@@ -241,9 +242,38 @@ void Boids::copyBoidsToVBO(float *vbodptr_positions, float *vbodptr_velocities) 
 */
 __device__ glm::vec3 computeVelocityChange(int N, int iSelf, const glm::vec3 *pos, const glm::vec3 *vel) {
   // Rule 1: boids fly towards their local perceived center of mass, which excludes themselves
+  glm::vec3 p = pos[iSelf], v = vel[iSelf];
+  glm::vec3 centre(0), separation(0), average_vel(0), deltaV(0);
+  int count1 = 0, count3 = 0;
+
+  for (int i = 0; i < N; i++) {
+    if (i == iSelf) continue;
+    glm::vec3 pos_dif = pos[i] - p;
+    float distance = glm::length(pos_dif);
+    if (distance < rule1Distance) {
+      centre += pos[i];
+      count1++;
+    }
+    if (distance < rule2Distance) {
+      separation -= (pos[i] - p);
+    }
+    if (distance < rule3Distance) {
+      average_vel += vel[i];
+      count3++;
+    }
+  }
+  if (count1 > 0) {
+    centre /= float(count1);
+    deltaV += (centre - p) * rule1Scale;
+  }
+  deltaV += separation * rule2Scale;
+  if (count3 > 0) {
+    average_vel /= float(count3);
+    deltaV += average_vel * rule3Scale;
+  }
   // Rule 2: boids try to stay a distance d away from each other
   // Rule 3: boids try to match the speed of surrounding boids
-  return glm::vec3(0.0f, 0.0f, 0.0f);
+  return deltaV;
 }
 
 /**
@@ -252,6 +282,13 @@ __device__ glm::vec3 computeVelocityChange(int N, int iSelf, const glm::vec3 *po
 */
 __global__ void kernUpdateVelocityBruteForce(int N, glm::vec3 *pos,
   glm::vec3 *vel1, glm::vec3 *vel2) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i >= N) return;
+  glm::vec3 newV = vel1[i] + computeVelocityChange(N, i, pos, vel1);
+  float s = glm::length(newV);
+  if (s > maxSpeed) newV = (newV / s) * maxSpeed;
+  vel2[i] = newV;
+
   // Compute a new velocity based on pos and vel1
   // Clamp the speed
   // Record the new velocity into vel2. Question: why NOT vel1?
@@ -280,7 +317,7 @@ __global__ void kernUpdatePos(int N, float dt, glm::vec3 *pos, glm::vec3 *vel) {
   thisPos.z = thisPos.z > scene_scale ? -scene_scale : thisPos.z;
 
   pos[index] = thisPos;
-}
+} 
 
 // LOOK-2.1 Consider this method of computing a 1D index from a 3D grid index.
 // LOOK-2.3 Looking at this method, what would be the most memory efficient
@@ -359,6 +396,18 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
 void Boids::stepSimulationNaive(float dt) {
   // TODO-1.2 - use the kernels you wrote to step the simulation forward in time.
   // TODO-1.2 ping-pong the velocity buffers
+  dim3 blocks((numObjects + blockSize - 1) / blockSize);
+
+  kernUpdateVelocityBruteForce << <blocks, blockSize >> > (numObjects, dev_pos, dev_vel1, dev_vel2);
+  checkCUDAErrorWithLine("Update vel brute force failed");
+
+  glm::vec3* temp = dev_vel1;
+  dev_vel1 = dev_vel2;
+  dev_vel2 = temp;
+
+  kernUpdatePos << <blocks, blockSize >> > (numObjects, dt, dev_pos, dev_vel1);
+  checkCUDAErrorWithLine("Update pos failed");
+  cudaDeviceSynchronize();
 }
 
 void Boids::stepSimulationScatteredGrid(float dt) {
