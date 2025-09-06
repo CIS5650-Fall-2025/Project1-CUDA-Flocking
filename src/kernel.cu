@@ -179,9 +179,9 @@ void Boids::initSimulation(int N) {
   gridCellCount = gridSideCount * gridSideCount * gridSideCount;
   gridInverseCellWidth = 1.0f / gridCellWidth;
   float halfGridWidth = gridCellWidth * halfSideCount;
-  gridMinimum.x -= halfGridWidth;
-  gridMinimum.y -= halfGridWidth;
-  gridMinimum.z -= halfGridWidth;
+  gridMinimum.x = -halfGridWidth;
+  gridMinimum.y = -halfGridWidth;
+  gridMinimum.z = -halfGridWidth;
 
   // TODO-2.1 : Allocate buffers
   
@@ -370,6 +370,7 @@ __global__ void kernComputeIndices(int N, int gridResolution,
     }
 
     glm::ivec3 gridIdx3D = (pos[boidIdx] - gridMin) * inverseCellWidth;
+
     int gridIdx1D = gridIndex3Dto1D(gridIdx3D.x, gridIdx3D.y, gridIdx3D.z, gridResolution);
 
     indices[boidIdx] = boidIdx;
@@ -394,16 +395,18 @@ __global__ void kernIdentifyCellStartEnd(int N, int *particleGridIndices,
   // This is basically a parallel unrolling of a loop that goes
   // "this index doesn't match the one before it, must be a new cell!"
 
-    int cellIdx = threadIdx.x + (blockIdx.x * blockDim.x);
-    if (cellIdx >= N) {
+    // CALLED WITH N = NUM GRIP CELLS
+
+    int idx = threadIdx.x + (blockIdx.x * blockDim.x);
+    if (idx >= N) {
         return;
     }
 
-    if (cellIdx == 0 || particleGridIndices[cellIdx] != particleGridIndices[cellIdx - 1]) {
-        gridCellStartIndices[particleGridIndices[cellIdx]] = cellIdx;
+    if (idx == 0 || particleGridIndices[idx] != particleGridIndices[idx - 1]) {
+        gridCellStartIndices[particleGridIndices[idx]] = idx;
     }
-    if (cellIdx == N - 1 || particleGridIndices[cellIdx] != particleGridIndices[cellIdx + 1]) {
-        gridCellEndIndices[particleGridIndices[cellIdx]] = cellIdx;
+    if (idx == N - 1 || particleGridIndices[idx] != particleGridIndices[idx + 1]) {
+        gridCellEndIndices[particleGridIndices[idx]] = idx;
     }
 }
 
@@ -443,20 +446,30 @@ __global__ void kernUpdateVelNeighborSearchScattered(
 
     // STEP 2: LOOP OVER SURROUNDING GRID
     glm::ivec3 baseGridCell = (pos[boidIdx] - gridMin) * inverseCellWidth;
-    glm::ivec3 curGridCell = (pos[boidIdx] - gridMin) * inverseCellWidth;
-    int curGridIdx1D = 0;
+    glm::ivec3 curGridCell = baseGridCell;
+    int curGridIdx1D;
 
     for (int xOff = -1; xOff <= 1; xOff++) {
         for (int yOff = -1; yOff <= 1; yOff++) {
             for (int zOff = -1; zOff <= 1; zOff++) {
                 // WRAP GRID CELL IDX
-                curGridCell.x = baseGridCell.x + xOff < 0 ? gridResolution : baseGridCell.x + xOff;
-                curGridCell.y = baseGridCell.y + yOff < 0 ? gridResolution : baseGridCell.y + yOff;
-                curGridCell.z = baseGridCell.z + zOff < 0 ? gridResolution : baseGridCell.z + zOff;
+                //curGridCell.x = baseGridCell.x + xOff < 0 ? gridResolution : baseGridCell.x + xOff;
+                //curGridCell.y = baseGridCell.y + yOff < 0 ? gridResolution : baseGridCell.y + yOff;
+                //curGridCell.z = baseGridCell.z + zOff < 0 ? gridResolution : baseGridCell.z + zOff;
 
-                curGridCell.x = baseGridCell.x + xOff > gridResolution ? 0 : baseGridCell.x + xOff;
-                curGridCell.y = baseGridCell.y + yOff > gridResolution ? 0 : baseGridCell.y + yOff;
-                curGridCell.z = baseGridCell.z + zOff > gridResolution ? 0 : baseGridCell.z + zOff;
+                //curGridCell.x = baseGridCell.x + xOff > gridResolution ? 0 : baseGridCell.x + xOff;
+                //curGridCell.y = baseGridCell.y + yOff > gridResolution ? 0 : baseGridCell.y + yOff;
+                //curGridCell.z = baseGridCell.z + zOff > gridResolution ? 0 : baseGridCell.z + zOff;
+
+                curGridCell.x = baseGridCell.x + xOff;
+                curGridCell.y = baseGridCell.y + yOff;
+                curGridCell.z = baseGridCell.z + zOff;
+
+                if (curGridCell.x < 0 || curGridCell.x >= gridResolution ||
+                    curGridCell.y < 0 || curGridCell.y >= gridResolution ||
+                    curGridCell.z < 0 || curGridCell.z >= gridResolution) {
+                    continue;
+                }
 
                 curGridIdx1D = gridIndex3Dto1D(curGridCell.x, curGridCell.y, curGridCell.z, gridResolution);
 
@@ -467,7 +480,7 @@ __global__ void kernUpdateVelNeighborSearchScattered(
 
                 int sortedIdx = 0;
                 // FOR EACH BOID IN THIS CELL (start -> end idx) do the three rules
-                for (int idx = gridCellStartIndices[curGridIdx1D]; idx < gridCellEndIndices[curGridIdx1D]; idx++) {
+                for (int idx = gridCellStartIndices[curGridIdx1D]; idx <= gridCellEndIndices[curGridIdx1D]; idx++) {
                     sortedIdx = particleArrayIndices[idx];
                     if (sortedIdx != boidIdx) {
                         // RULE 1:
@@ -565,9 +578,10 @@ void Boids::stepSimulationScatteredGrid(float dt) {
     int gridSizeBoids = (numObjects + blockSize - 1) / blockSize;
     int gridSizeCells = (gridCellCount + blockSize - 1) / blockSize; 
 
+
     // RESET START AND END BUFFERS TO -1
-    kernResetIntBuffer << <gridSizeCells, blockSize >> > (numObjects, dev_gridCellStartIndices, -1);
-    kernResetIntBuffer << <gridSizeCells, blockSize >> > (numObjects, dev_gridCellEndIndices, -1);
+    kernResetIntBuffer << <gridSizeCells, blockSize >> > (gridCellCount, dev_gridCellStartIndices, -1);
+    kernResetIntBuffer << <gridSizeCells, blockSize >> > (gridCellCount, dev_gridCellEndIndices, -1);
 
     // COMPUTE GRID / BOID INDEXING
     kernComputeIndices << <gridSizeBoids, blockSize >> > (numObjects, gridSideCount, gridMinimum, gridInverseCellWidth,
@@ -577,10 +591,10 @@ void Boids::stepSimulationScatteredGrid(float dt) {
     dev_thrust_particleArrayIndices = thrust::device_pointer_cast(dev_particleArrayIndices);
     dev_thrust_particleGridIndices = thrust::device_pointer_cast(dev_particleGridIndices);
 
-    thrust::sort_by_key(dev_particleGridIndices, dev_particleGridIndices + numObjects, dev_thrust_particleArrayIndices);
+    thrust::sort_by_key(dev_thrust_particleGridIndices, dev_thrust_particleGridIndices + numObjects, dev_thrust_particleArrayIndices);
 
     // FIND START AND END IDXS (each thread is a cell)
-    kernIdentifyCellStartEnd << < gridSizeCells, blockSize >> > (numObjects, dev_particleGridIndices,
+    kernIdentifyCellStartEnd << < gridSizeBoids, blockSize >> > (numObjects, dev_particleGridIndices,
                                                                  dev_gridCellStartIndices, dev_gridCellEndIndices);
 
     // UPDATE VELOCITY BASED ON 3 RULES USING GRID
