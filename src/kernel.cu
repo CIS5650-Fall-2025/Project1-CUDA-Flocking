@@ -418,7 +418,7 @@ __global__ void kernIdentifyCellStartEnd(int N, int *particleGridIndices,
     // edge case
     if (index == 0) {
         gridCellStartIndices[currIndex] = index;
-}
+    }
     else if (currIndex > particleGridIndices[index - 1]) {
         gridCellStartIndices[currIndex] = index;
         gridCellEndIndices[particleGridIndices[index - 1]] = index-1;
@@ -461,19 +461,19 @@ __global__ void kernUpdateVelNeighborSearchScattered(
 
     glm::vec3 velocity_out = vel1[index];
 
-  // - Identify which cells may contain neighbors. This isn't always 8.
+    // - Identify which cells may contain neighbors. This isn't always 8.
     // get the min/max bounds of each dim using the distance from the rules
     for (int x = imax(0, (gridIndex_3d[0] - distance) * inverseCellWidth); x <= imin(gridResolution - 1, (gridIndex_3d[0] + distance) * inverseCellWidth); x++) {
         for (int y = imax(0, (gridIndex_3d[1] - distance) * inverseCellWidth); y <= imin(gridResolution - 1, (gridIndex_3d[1] + distance) * inverseCellWidth); y++) {
             for (int z = imax(0, (gridIndex_3d[2] - distance) * inverseCellWidth); z <= imin(gridResolution - 1, (gridIndex_3d[2] + distance) * inverseCellWidth); z++) {
 
-  // - For each cell, read the start/end indices in the boid pointer array.
+                // - For each cell, read the start/end indices in the boid pointer array.
                 int cellIndx = gridIndex3Dto1D(x, y, z, gridResolution);
 
                 for (int i = gridCellStartIndices[cellIndx]; i <= gridCellEndIndices[cellIndx]; i++) {
 
-  // - Access each boid in the cell and compute velocity change from
-  //   the boids rules, if this boid is within the neighborhood distance.
+                    // - Access each boid in the cell and compute velocity change from
+                    //   the boids rules, if this boid is within the neighborhood distance.
                     int compareBoid = i;
                     float boidDistance = glm::distance(pos[index], pos[compareBoid]);
 
@@ -499,12 +499,12 @@ __global__ void kernUpdateVelNeighborSearchScattered(
         }
     }
 
-  // - Clamp the speed change before putting the new speed in vel2
+    // - Clamp the speed change before putting the new speed in vel2
 
     if (ruleThree_neighbours > 0) {
         perceived_velocity /= ruleThree_neighbours;
         velocity_out += perceived_velocity * rule3Scale;
-}
+    }
 
     velocity_out += separate * rule2Scale;
 
@@ -540,9 +540,7 @@ void Boids::stepSimulationNaive(float dt) {
   // TODO-1.2 ping-pong the velocity buffers
   // ping pong = swapping the buffers 
   // b/c don't want to read/write to same one
-  glm::vec3* vel_ptr = dev_vel1;
-  dev_vel1 = dev_vel2;
-  dev_vel2 = vel_ptr;
+  cudaMemcpy(dev_vel2, dev_vel1, sizeof(glm::vec3) * numObjects, cudaMemcpyDeviceToDevice);
 
   kernUpdatePos << <blockSize, threadsPerBlock >> > (numObjects, dt, dev_pos, dev_vel1);
 }
@@ -575,9 +573,7 @@ void Boids::stepSimulationScatteredGrid(float dt) {
         dev_gridCellEndIndices, dev_particleArrayIndices, dev_pos, dev_vel1, dev_vel2);
   // - Update positions
   // - Ping-pong buffers as needed
-    glm::vec3* vel_ptr = dev_vel1;
-    dev_vel1 = dev_vel2;
-    dev_vel2 = vel_ptr;
+    cudaMemcpy(dev_vel2, dev_vel1, sizeof(glm::vec3) * numObjects, cudaMemcpyDeviceToDevice);
 
     kernUpdatePos << <blockSize, threadsPerBlock >> > (numObjects, dt, dev_pos, dev_vel1);
 }
