@@ -425,7 +425,7 @@ __global__ void kernFillCoherentBuffers(int N, glm::vec3* pos,
 	int curr_boid = particleArrayIndices[index];
     pos_coher[index] = pos[curr_boid];
     vel1_coher[index] = vel1[curr_boid];
-	vel2_coher[index] = vel2[curr_boid];
+	//vel2_coher[index] = vel2[curr_boid];
 }
 
 __global__ void kernUpdateVelNeighborSearchScattered(
@@ -747,18 +747,20 @@ void Boids::stepSimulationCoherentGrid(float dt) {
 	kernFillCoherentBuffers<<<fullBlocksPerGrid, blockSize>>>(N, dev_pos, dev_vel1, dev_vel2, dev_posCoher, dev_vel1Coher, dev_vel2Coher, dev_particleArrayIndices);
 
     kernUpdateVelNeighborSearchCoherent<<<fullBlocksPerGrid, blockSize>>>(N, gridSideCount, gridMinimum, gridInverseCellWidth, gridCellWidth, dev_gridCellStartIndices, dev_gridCellEndIndices, dev_posCoher, dev_vel1Coher, dev_vel2Coher);
-    kernUpdatePos<<<fullBlocksPerGrid, blockSize>>>(N, dt, dev_pos, dev_vel2);
+    kernUpdatePos<<<fullBlocksPerGrid, blockSize>>>(N, dt, dev_posCoher, dev_vel2Coher);
 
-    //todo pingpong
-    glm::vec3* temp_pos = dev_pos;
-	glm::vec3* temp_vel1 = dev_vel1;
-    glm::vec3* temp_vel2 = dev_vel2;
+    glm::vec3* temp_vel = dev_vel1Coher;
+    dev_vel1Coher = dev_vel2Coher;
+    dev_vel2Coher = temp_vel;
+
+    temp_vel = dev_pos;
     dev_pos = dev_posCoher;
+    dev_posCoher = temp_vel;
+
+    temp_vel = dev_vel1;
     dev_vel1 = dev_vel1Coher;
-	dev_vel2 = dev_vel2Coher;
-    dev_posCoher = temp_pos;
-	dev_vel1Coher = temp_vel1;
-	dev_vel2Coher = temp_vel2;
+    dev_vel1Coher = temp_vel;
+
 }
 
 void Boids::endSimulation() {
