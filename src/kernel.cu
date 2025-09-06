@@ -56,13 +56,18 @@ void checkCUDAError(const char *msg, int line = -1) {
 #define rule3Distance 5.0f
 
 #define rule1Scale 0.01f
-#define rule2Scale 0.1f
-#define rule3Scale 0.1f
+#define rule2Scale .1f
+#define rule3Scale .1f
+#define rule4Scale 0.000f
+#define rule5Scale 0.01f
+#define rule6Scale 0.00f
+#define rule7Scale 2.f
 
-#define maxSpeed 1.0f
+#define maxSpeed 2.0f
 
 /*! Size of the starting area in simulation space. */
-#define scene_scale 100.0f
+#define scene_scale 250.0f
+#define WALLS 1
 
 /***********************************************
 * Kernel state (pointers are device pointers) *
@@ -340,13 +345,15 @@ __global__ void kernUpdatePos(int N, float dt, glm::vec3 *pos, glm::vec3 *vel) {
   thisPos += vel[index] * dt;
 
   // Wrap the boids around so we don't lose them
+#if WALLS == 0
   thisPos.x = thisPos.x < -scene_scale ? scene_scale : thisPos.x;
   thisPos.y = thisPos.y < -scene_scale ? scene_scale : thisPos.y;
   thisPos.z = thisPos.z < -scene_scale ? scene_scale : thisPos.z;
 
   thisPos.x = thisPos.x > scene_scale ? -scene_scale : thisPos.x;
   thisPos.y = thisPos.y > scene_scale ? -scene_scale : thisPos.y;
-  thisPos.z = thisPos.z > scene_scale ? -scene_scale : thisPos.z;
+  thisPos.z = thisPos.z > scene_scale ? -scene_scale : thisPos.z; 
+#endif
 
   pos[index] = thisPos;
 }
@@ -495,7 +502,7 @@ __global__ void kernUpdateVelNeighborSearchScattered(
 }
 
 __global__ void kernUpdateVelNeighborSearchCoherent(
-  int N, int gridResolution, glm::vec3 gridMin,
+  int N, float time, int gridResolution, glm::vec3 gridMin,
   float inverseCellWidth, float cellWidth,
   int *gridCellStartIndices, int *gridCellEndIndices,
   glm::vec3 *pos, glm::vec3 *vel1, glm::vec3 *vel2) {
@@ -575,7 +582,25 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
         calcVel += neighborVel * rule3Scale;
     }
 
+    calcVel += pos[index] * -1.f * rule4Scale;
+
+    calcVel += pos[index] * -1.f * (rule7Scale * (1 + glm::sin(time/2))) / (1 + glm::distance(pos[index], glm::vec3(0, 0, 0)) * glm::distance(pos[index], glm::vec3(0,0,0)));
+
+
+    calcVel += glm::vec3(0, 0, 1) * rule5Scale;
+
+    calcVel += (glm::vec3(glm::sin(time / 10) * scene_scale/2.f, glm::cos(time / 10) * scene_scale/2.f, glm::cos(time / 10) * scene_scale/4.f) - pos[index])* rule6Scale;
+
     calcVel = glm::length(calcVel) > maxSpeed ? glm::normalize(calcVel) * maxSpeed : calcVel;
+    
+#if WALLS
+    calcVel.x = (pos[index].x > scene_scale ? glm::min(calcVel.x, calcVel.x * -1) : pos[index].x < -scene_scale ? glm::max(calcVel.x, calcVel.x * -1) : calcVel.x);
+    calcVel.y = (pos[index].y > scene_scale ? glm::min(calcVel.y, calcVel.y * -1) : pos[index].y < -scene_scale ? glm::max(calcVel.y, calcVel.y * -1) : calcVel.y);
+    calcVel.z = (pos[index].z > scene_scale ? glm::min(calcVel.z, calcVel.z * -1) : pos[index].z < -scene_scale ? glm::max(calcVel.z, calcVel.z * -1) : calcVel.z);
+#endif // 
+
+
+
     vel2[index] = calcVel;
 }
 
@@ -605,7 +630,7 @@ void Boids::stepSimulationNaive(float dt) {
     cudaMemcpy(dev_vel1, dev_vel2, sizeof(glm::vec3) * numObjects, cudaMemcpyDeviceToDevice);
 }
 
-void Boids::stepSimulationScatteredGrid(float dt) {
+void Boids::stepSimulationScatteredGrid(float dt, float time) {
   // TODO-2.1
   // Uniform Grid Neighbor search using Thrust sort.
   // In Parallel:
@@ -640,7 +665,7 @@ void Boids::stepSimulationScatteredGrid(float dt) {
    // cudaMemcpy(dev_vel1, dev_vel2, sizeof(glm::vec3) * numObjects, cudaMemcpyDeviceToDevice);
 }
 
-void Boids::stepSimulationCoherentGrid(float dt) {
+void Boids::stepSimulationCoherentGrid(float dt, float time) {
   // TODO-2.3 - start by copying Boids::stepSimulationNaiveGrid
   // Uniform Grid Neighbor search using Thrust sort on cell-coherent data.
   // In Parallel:
@@ -671,7 +696,7 @@ void Boids::stepSimulationCoherentGrid(float dt) {
 
     
     kernUpdateVelNeighborSearchCoherent << < fullBlocksPerGrid, blockSize >> > (
-        numObjects, gridSideCount, gridMinimum,
+        numObjects, time, gridSideCount, gridMinimum,
         gridInverseCellWidth, gridCellWidth,
         dev_gridCellStartIndices, dev_gridCellEndIndices,
         dev_pos1, dev_vel1, dev_vel2);
