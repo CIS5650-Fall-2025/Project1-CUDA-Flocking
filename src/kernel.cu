@@ -184,6 +184,9 @@ void Boids::initSimulation(int N) {
   cudaMalloc((void**)&dev_gridCellStartIndices, gridCellCount * sizeof(int));
   cudaMalloc((void**)&dev_gridCellEndIndices, gridCellCount * sizeof(int));
 
+  dev_thrust_particleArrayIndices = thrust::device_ptr<int>(dev_particleArrayIndices);
+  dev_thrust_particleGridIndices = thrust::device_ptr<int>(dev_particleGridIndices);
+
   cudaDeviceSynchronize();
 }
 
@@ -373,11 +376,11 @@ __global__ void kernComputeIndices(int N, int gridResolution,
     int y = boidPos.y * inverseCellWidth; 
     int z = boidPos.z * inverseCellWidth; 
     int gridIndex = gridIndex3Dto1D(x, y, z, gridResolution);
-    //gridIndices[index] = gridIndex; 
+    gridIndices[index] = gridIndex; 
 
     // - Set up a parallel array of integer indices as pointers to the actual
     //   boid data in pos and vel1/vel2
-    //indices[index] = index; 
+    indices[index] = index; 
 }
 
 // LOOK-2.1 Consider how this could be useful for indicating that a cell
@@ -447,23 +450,25 @@ void Boids::stepSimulationNaive(float dt) {
 }
 
 void Boids::stepSimulationScatteredGrid(float dt) {
-  // TODO-2.1
-  // Uniform Grid Neighbor search using Thrust sort.
-  // In Parallel:
-  // - label each particle with its array index as well as its grid index.
-  //   Use 2x width grids.
+    // TODO-2.1
+    // Uniform Grid Neighbor search using Thrust sort.
+    // In Parallel:
+    // - label each particle with its array index as well as its grid index.
+    //   Use 2x width grids.
     dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
     kernComputeIndices << <fullBlocksPerGrid, blockSize >> > (numObjects, gridSideCount, gridMinimum, 1.0f / gridCellWidth,
         dev_pos, dev_particleArrayIndices, dev_particleGridIndices);
     checkCUDAErrorWithLine("Failed to compute indices"); 
 
-  // - Unstable key sort using Thrust. A stable sort isn't necessary, but you
-  //   are welcome to do a performance comparison.
-  // - Naively unroll the loop for finding the start and end indices of each
-  //   cell's data pointers in the array of boid indices
-  // - Perform velocity updates using neighbor search
-  // - Update positions
-  // - Ping-pong buffers as needed
+    // - Unstable key sort using Thrust. A stable sort isn't necessary, but you
+    //   are welcome to do a performance comparison.
+    thrust::sort_by_key(dev_thrust_particleGridIndices, dev_thrust_particleGridIndices + numObjects, dev_thrust_particleArrayIndices); 
+  
+    // - Naively unroll the loop for finding the start and end indices of each
+    //   cell's data pointers in the array of boid indices
+    // - Perform velocity updates using neighbor search
+    // - Update positions
+    // - Ping-pong buffers as needed
 }
 
 void Boids::stepSimulationCoherentGrid(float dt) {
