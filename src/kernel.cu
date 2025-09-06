@@ -438,12 +438,77 @@ __global__ void kernUpdateVelNeighborSearchScattered(
   glm::vec3 *pos, glm::vec3 *vel1, glm::vec3 *vel2) {
   // TODO-2.1 - Update a boid's velocity using the uniform grid to reduce
   // the number of boids that need to be checked.
-  // - Identify the grid cell that this particle is in
+    int index = threadIdx.x + (blockIdx.x * blockDim.x);
+    if (index >= N) {
+        return;
+    }
+
+    // Identify the grid cell that this particle is in
+    glm::vec3 gridIndex_3d = (pos[index] - gridMin) * inverseCellWidth;
+    
+    // get distance from the rules!
+    float distance = rule1Distance > rule2Distance ? rule1Distance : rule2Distance;
+    distance = distance > rule3Distance ? distance : rule3Distance;
+
+    // variables to be used for velocity calculation/updating
+    glm::vec3 perceived_center = glm::vec3(0);
+    int ruleOne_neighbours = 0;
+
+    glm::vec3 separate = glm::vec3(0);
+
+    glm::vec3 perceived_velocity = glm::vec3(0);
+    int ruleThree_neighbours = 0;
+
+    glm::vec3 velocity_out = vel1[index];
+
   // - Identify which cells may contain neighbors. This isn't always 8.
+    // get the min/max bounds of each dim using the distance from the rules
+    for (int x = imax(0, (gridIndex_3d[0] - distance) * inverseCellWidth); x <= imin(gridResolution - 1, (gridIndex_3d[0] + distance) * inverseCellWidth); x++) {
+        for (int y = imax(0, (gridIndex_3d[1] - distance) * inverseCellWidth); y <= imin(gridResolution - 1, (gridIndex_3d[1] + distance) * inverseCellWidth); y++) {
+            for (int z = imax(0, (gridIndex_3d[2] - distance) * inverseCellWidth); z <= imin(gridResolution - 1, (gridIndex_3d[2] + distance) * inverseCellWidth); z++) {
+
   // - For each cell, read the start/end indices in the boid pointer array.
+                int cellIndx = gridIndex3Dto1D(x, y, z, gridResolution);
+
+                for (int i = gridCellStartIndices[cellIndx]; i <= gridCellEndIndices[cellIndx]; i++) {
+
   // - Access each boid in the cell and compute velocity change from
   //   the boids rules, if this boid is within the neighborhood distance.
+                    int compareBoid = i;
+                    float boidDistance = glm::distance(pos[index], pos[compareBoid]);
+
+                    // Rule 1: boids fly towards their local perceived center of mass, which excludes themselves
+                    if (boidDistance < rule1Distance) {
+                        perceived_center += pos[compareBoid];
+                        ruleOne_neighbours++;
+                    }
+
+                    // Rule 2: boids try to stay a distance d away from each other
+                    if (boidDistance < rule2Distance) {
+                        separate -= (pos[compareBoid] - pos[index]);
+                    }
+
+                    // Rule 3: boids try to match the speed of surrounding boids
+                    if (boidDistance < rule3Distance) {
+                        perceived_velocity += vel1[compareBoid];
+                        ruleThree_neighbours++;
+                    }
+
+                }
+            }
+        }
+    }
+
   // - Clamp the speed change before putting the new speed in vel2
+
+    if (ruleThree_neighbours > 0) {
+        perceived_velocity /= ruleThree_neighbours;
+        velocity_out += perceived_velocity * rule3Scale;
+}
+
+    velocity_out += separate * rule2Scale;
+
+    vel2[index] = velocity_out;
 }
 
 __global__ void kernUpdateVelNeighborSearchCoherent(
