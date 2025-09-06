@@ -6,6 +6,43 @@ Project 1 - Flocking**
 
 * Tested on: Windows 11, i7-14700K @ 3.40GHz, 64GB RAM, NVIDIA GeForce RTX 4080 SUPER
 
+## Final Outputs
+
+### GIFs
+<table>
+  <tr>
+    <td align="center">5000 Boids</td>
+    <td align="center">50000 Boids</td>
+  </tr>
+  <tr>
+    <td><img src="https://github.com/user-attachments/assets/fd0042ba-52b7-47bb-8141-95082c313307" alt="small" width="400"/></td>
+    <td><img src="https://github.com/user-attachments/assets/4a7a025d-bdce-4fe5-8d84-0b7c4ca89e56" alt="large" width="400"/></td>
+  </tr>
+</table>
+
+### Screenshots
+<table>
+  <tr>
+    <td align="center">5000 Boids (Start)</td>
+    <td align="center">5000 Boids (End)</td>
+  </tr>
+  <tr>
+    <td><img src="https://github.com/user-attachments/assets/264864ab-78cb-4eb8-a618-cea18bf7a414" alt="small_start" width="400"/></td>
+    <td><img src="https://github.com/user-attachments/assets/07806c1c-812b-4fbc-bf52-c9fb21ad0e87" alt="small_end" width="400"/></td>
+  </tr>
+</table>
+
+<table>
+  <tr>
+    <td align="center">50000 Boids (Start)</td>
+    <td align="center">50000 Boids (End)</td>
+  </tr>
+  <tr>
+    <td><img src="https://github.com/user-attachments/assets/b2fea55e-4ca4-49ad-b566-8034eebd692e" alt="large_start" width="400"/></td>
+    <td><img src="https://github.com/user-attachments/assets/56f25165-2afe-406b-a22d-b2351aaced1c" alt="large_end" width="400"/></td>
+  </tr>
+</table>
+
 
 This project implements a parallelized **Boids flocking simulation** using **CUDA** and **OpenGL**.  
 The simulation models realistic flocking behavior (cohesion, separation, and alignment) for thousands of boids in 3D space.  
