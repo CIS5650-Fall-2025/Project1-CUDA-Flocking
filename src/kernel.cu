@@ -553,13 +553,33 @@ void Boids::stepSimulationScatteredGrid(float dt) {
   // In Parallel:
   // - label each particle with its array index as well as its grid index.
   //   Use 2x width grids.
+  
+    kernComputeIndices << <blockSize, threadsPerBlock >> > (numObjects, 
+        gridSideCount, gridMinimum, gridInverseCellWidth, dev_pos, dev_particleArrayIndices,
+        dev_particleGridIndices);
+
   // - Unstable key sort using Thrust. A stable sort isn't necessary, but you
   //   are welcome to do a performance comparison.
+
+    dev_thrust_particleGridIndices = thrust::device_ptr<int> (dev_particleGridIndices);
+    dev_thrust_particleArrayIndices = thrust::device_ptr<int> (dev_particleArrayIndices);
+    thrust::sort_by_key(dev_thrust_particleGridIndices, dev_thrust_particleGridIndices + numObjects, dev_thrust_particleArrayIndices);
+
   // - Naively unroll the loop for finding the start and end indices of each
   //   cell's data pointers in the array of boid indices
+    kernIdentifyCellStartEnd << <blockSize, threadsPerBlock >> > (numObjects, 
+        dev_particleGridIndices, dev_gridCellStartIndices, dev_gridCellEndIndices);
   // - Perform velocity updates using neighbor search
+    kernUpdateVelNeighborSearchScattered << <blockSize, threadsPerBlock >> > (numObjects, 
+        gridSideCount, gridMinimum, gridInverseCellWidth, gridCellWidth, dev_gridCellStartIndices,
+        dev_gridCellEndIndices, dev_particleArrayIndices, dev_pos, dev_vel1, dev_vel2);
   // - Update positions
   // - Ping-pong buffers as needed
+    glm::vec3* vel_ptr = dev_vel1;
+    dev_vel1 = dev_vel2;
+    dev_vel2 = vel_ptr;
+
+    kernUpdatePos << <blockSize, threadsPerBlock >> > (numObjects, dt, dev_pos, dev_vel1);
 }
 
 void Boids::stepSimulationCoherentGrid(float dt) {
