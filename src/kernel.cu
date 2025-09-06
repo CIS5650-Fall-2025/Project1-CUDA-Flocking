@@ -302,6 +302,28 @@ __device__ glm::vec3 computeVelocityChange(int N, int iSelf, const glm::vec3 *po
   return deltaV;
 }
 
+// Compute inclusive cell index range that intersects a sphere of radius R
+// centered at p. Clamps to [0, gridResolution-1].
+__device__ __forceinline__
+void cellRangeForRadius(const glm::vec3& p,
+  glm::vec3 gridMin, float invCellWidth, int gridResolution,
+  float R,
+  int& xMin, int& xMax, int& yMin, int& yMax, int& zMin, int& zMax)
+{
+  // Position in cell space
+  glm::vec3 rel = (p - gridMin) * invCellWidth;
+  // radius in cell units
+  float rCells = R * invCellWidth;
+
+  // Inclusive bounds: any cell whose interval overlaps [rel - rCells, rel + rCells]
+  xMin = imax(0, imin(gridResolution - 1, (int)floorf(rel.x - rCells)));
+  xMax = imax(0, imin(gridResolution - 1, (int)floorf(rel.x + rCells)));
+  yMin = imax(0, imin(gridResolution - 1, (int)floorf(rel.y - rCells)));
+  yMax = imax(0, imin(gridResolution - 1, (int)floorf(rel.y + rCells)));
+  zMin = imax(0, imin(gridResolution - 1, (int)floorf(rel.z - rCells)));
+  zMax = imax(0, imin(gridResolution - 1, (int)floorf(rel.z + rCells)));
+}
+
 /**
 * For each of the `N` bodies, update its position based on its current velocity.
 */
@@ -466,7 +488,7 @@ __global__ void kernUpdateVelNeighborSearchScattered(
   glm::vec3 centre(0), separation(0), averageV(0);
   int count1 = 0, count3 = 0;
 
-  // Visit the (up to) 8 neighbor cells in cache-friendly order:
+  // Visit up to 8 neighbour cells
   for (int x = 0; x < xCount; x++) {
     for (int y = 0; y < yCount; y++) {
 	    for (int z = 0; z < zCount; z++) {
@@ -522,6 +544,11 @@ __global__ void kernUpdateVelNeighborSearchScattered(
   vel2[boidIdx] = v;
 }
 
+
+#ifndef GRID_LOOP_OPT
+#define GRID_LOOP_OPT 0
+#endif
+
 __global__ void kernUpdateVelNeighborSearchCoherent(
   int N, int gridResolution, glm::vec3 gridMin,
   float inverseCellWidth, float cellWidth,
@@ -534,34 +561,43 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
   // Current boid’s position (already coherent).
   glm::vec3 p = pos[i];
 
-  // Convert position to grid coordinates, then to integer cell coords.
-  glm::vec3 rel = (p - gridMin) * inverseCellWidth;
-  int grid_x = imax(0, imin(gridResolution - 1, int(floorf(rel.x))));
-  int grid_y = imax(0, imin(gridResolution - 1, int(floorf(rel.y))));
-  int grid_z = imax(0, imin(gridResolution - 1, int(floorf(rel.z))));
+  int xMin, xMax, yMin, yMax, zMin, zMax;
 
-  // Fractional parts inside the cell to decide which neighbor slab is closer.
-  float frac_x = rel.x - floorf(rel.x);
-  float frac_y = rel.y - floorf(rel.y);
-  float frac_z = rel.z - floorf(rel.z);
+	#if GRID_LOOP_OPT
+	  // Grid-loop optimization: sweep every cell intersecting radius R
+	  const float R = fmaxf(fmaxf(rule1Distance, rule2Distance), rule3Distance);
+	  cellRangeForRadius(p, gridMin, inverseCellWidth, gridResolution, R,
+	    xMin, xMax, yMin, yMax, zMin, zMax);
+	#else
+	  // Convert position to grid coordinates, then to integer cell coords.
+	  glm::vec3 rel = (p - gridMin) * inverseCellWidth;
+	  int grid_x = imax(0, imin(gridResolution - 1, int(floorf(rel.x))));
+	  int grid_y = imax(0, imin(gridResolution - 1, int(floorf(rel.y))));
+	  int grid_z = imax(0, imin(gridResolution - 1, int(floorf(rel.z))));
 
-  // Choose the "other" candidate cell along each axis (left/right, down/up, back/front)
-  // so we visit at most 2 cells per axis (<= 8 total).
-  int nx = grid_x + ((frac_x >= 0.5f) ? 1 : -1);
-  int ny = grid_y + ((frac_y >= 0.5f) ? 1 : -1);
-  int nz = grid_z + ((frac_z >= 0.5f) ? 1 : -1);
-  nx = imax(0, imin(gridResolution - 1, nx));
-  ny = imax(0, imin(gridResolution - 1, ny));
-  nz = imax(0, imin(gridResolution - 1, nz));
+	  // Fractional parts inside the cell to decide which neighbor slab is closer.
+	  float frac_x = rel.x - floorf(rel.x);
+	  float frac_y = rel.y - floorf(rel.y);
+	  float frac_z = rel.z - floorf(rel.z);
 
-  // Determine the inclusive ranges we’ll sweep on each axis.
-  // (If nx==grid_x, range collapses to one cell on that axis.)
-  int xMin = (nx < grid_x) ? nx : grid_x;
-  int xMax = (nx < grid_x) ? grid_x : nx;
-  int yMin = (ny < grid_y) ? ny : grid_y;
-  int yMax = (ny < grid_y) ? grid_y : ny;
-  int zMin = (nz < grid_z) ? nz : grid_z;
-  int zMax = (nz < grid_z) ? grid_z : nz;
+	  // Choose the "other" candidate cell along each axis (left/right, down/up, back/front)
+	  // so we visit at most 2 cells per axis (<= 8 total).
+	  int nx = grid_x + ((frac_x >= 0.5f) ? 1 : -1);
+	  int ny = grid_y + ((frac_y >= 0.5f) ? 1 : -1);
+	  int nz = grid_z + ((frac_z >= 0.5f) ? 1 : -1);
+	  nx = imax(0, imin(gridResolution - 1, nx));
+	  ny = imax(0, imin(gridResolution - 1, ny));
+	  nz = imax(0, imin(gridResolution - 1, nz));
+
+	  // Determine the inclusive ranges we’ll sweep on each axis.
+	  // (If nx==grid_x, range collapses to one cell on that axis.)
+	  xMin = (nx < grid_x) ? nx : grid_x;
+	  xMax = (nx < grid_x) ? grid_x : nx;
+	  yMin = (ny < grid_y) ? ny : grid_y;
+	  yMax = (ny < grid_y) ? grid_y : ny;
+	  zMin = (nz < grid_z) ? nz : grid_z;
+	  zMax = (nz < grid_z) ? grid_z : nz;
+	#endif
 
   glm::vec3 centre(0), separation(0), averageV(0);
   int count1 = 0, count3 = 0;
