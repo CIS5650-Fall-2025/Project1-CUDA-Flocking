@@ -245,6 +245,67 @@ void Boids::copyBoidsToVBO(float *vbodptr_positions, float *vbodptr_velocities) 
 * stepSimulation *
 ******************/
 
+__device__ void RuleLogic(int minBounds, int maxBounds, int currB,
+    const glm::vec3* pos, const glm::vec3* vel, int& ruleOne_neighbours,
+    int& ruleThree_neighbours, glm::vec3& separate, glm::vec3& perceived_velocity,
+    glm::vec3& perceived_center, int naiveFlag = 0, int * particleArrayIndices = nullptr) {
+
+    for (int i = minBounds; i < maxBounds; i++) {
+        // skipping comparison of same boid
+        if (currB == i) {
+            continue;
+        }
+
+        int compareBoid;
+
+        if (naiveFlag == 1) {
+            compareBoid = particleArrayIndices[i];
+        }
+        else {
+            compareBoid = i;
+        }
+
+        float distance = glm::distance(pos[currB], pos[compareBoid]);
+
+        // Rule 1: boids fly towards their local perceived center of mass, which excludes themselves
+        if (distance < rule1Distance) {
+            perceived_center += pos[compareBoid];
+            ruleOne_neighbours++;
+        }
+
+        // Rule 2: boids try to stay a distance d away from each other
+        if (distance < rule2Distance) {
+            separate -= (pos[compareBoid] - pos[currB]);
+        }
+
+        // Rule 3: boids try to match the speed of surrounding boids
+        if (distance < rule3Distance) {
+            perceived_velocity += vel[compareBoid];
+            ruleThree_neighbours++;
+        }
+    }
+}
+
+__device__ glm::vec3 ComputeFinalVelocity(int currB, const glm::vec3* pos, int ruleOne_neighbours,
+    int ruleThree_neighbours, glm::vec3 separate, glm::vec3 perceived_velocity,
+    glm::vec3 perceived_center, glm::vec3 velocity_out) {
+
+    if (ruleOne_neighbours > 0) {
+        perceived_center /= ruleOne_neighbours;
+        velocity_out += (perceived_center - pos[currB]) * rule1Scale;
+    }
+
+    // not in 2D implementaion??
+    if (ruleThree_neighbours > 0) {
+        perceived_velocity /= ruleThree_neighbours;
+        velocity_out += perceived_velocity * rule3Scale;
+    }
+
+    velocity_out += separate * rule2Scale;
+
+    return velocity_out;
+}
+
 /**
 * LOOK-1.2 You can use this as a helper for kernUpdateVelocityBruteForce.
 * __device__ code can be called from a __global__ context
@@ -263,47 +324,13 @@ __device__ glm::vec3 computeVelocityChange(int N, int iSelf, const glm::vec3 *po
 
     glm::vec3 velocity_out = vel[iSelf];
 
-    for (int i = 0; i < N; i++) {
-        // skipping comparison of same boid
-        if (iSelf == i) {
-            continue;
-        }
+    RuleLogic(0, N, iSelf, pos, vel, ruleOne_neighbours,
+        ruleThree_neighbours, separate, perceived_velocity,
+        perceived_center);
 
-        int compareBoid = i;
-        float distance = glm::distance(pos[iSelf], pos[compareBoid]);
-
-        // Rule 1: boids fly towards their local perceived center of mass, which excludes themselves
-        if (distance < rule1Distance) {
-            perceived_center += pos[compareBoid];
-            ruleOne_neighbours++;
-        }
-
-        // Rule 2: boids try to stay a distance d away from each other
-        if (distance < rule2Distance) {
-            separate -= (pos[compareBoid] - pos[iSelf]);
-        }
-
-        // Rule 3: boids try to match the speed of surrounding boids
-        if (distance < rule3Distance) {
-            perceived_velocity += vel[compareBoid];
-            ruleThree_neighbours++;
-        }
-    }
-
-    if (ruleOne_neighbours > 0) {
-        perceived_center /= ruleOne_neighbours;
-        velocity_out += (perceived_center - pos[iSelf]) * rule1Scale;
-    }
-
-    // not in 2D implementaion??
-    if (ruleThree_neighbours > 0) {
-        perceived_velocity /= ruleThree_neighbours;
-        velocity_out += perceived_velocity * rule3Scale;
-    }
-
-    velocity_out += separate * rule2Scale;
-
-    return velocity_out;
+    return ComputeFinalVelocity(iSelf, pos, ruleOne_neighbours,
+        ruleThree_neighbours, separate, perceived_velocity,
+        perceived_center, velocity_out);
 }
 
 /**
@@ -470,45 +497,17 @@ __global__ void kernUpdateVelNeighborSearchScattered(
                 // - For each cell, read the start/end indices in the boid pointer array.
                 int cellIndx = gridIndex3Dto1D(x, y, z, gridResolution);
 
-                for (int i = gridCellStartIndices[cellIndx]; i <= gridCellEndIndices[cellIndx]; i++) {
-
-                    // - Access each boid in the cell and compute velocity change from
-                    //   the boids rules, if this boid is within the neighborhood distance.
-                    int compareBoid = i;
-                    float boidDistance = glm::distance(pos[index], pos[compareBoid]);
-
-                    // Rule 1: boids fly towards their local perceived center of mass, which excludes themselves
-                    if (boidDistance < rule1Distance) {
-                        perceived_center += pos[compareBoid];
-                        ruleOne_neighbours++;
-                    }
-
-                    // Rule 2: boids try to stay a distance d away from each other
-                    if (boidDistance < rule2Distance) {
-                        separate -= (pos[compareBoid] - pos[index]);
-                    }
-
-                    // Rule 3: boids try to match the speed of surrounding boids
-                    if (boidDistance < rule3Distance) {
-                        perceived_velocity += vel1[compareBoid];
-                        ruleThree_neighbours++;
-                    }
-
-                }
+                RuleLogic(gridCellStartIndices[cellIndx], gridCellEndIndices[cellIndx], index, pos, 
+                    vel1, ruleOne_neighbours, ruleThree_neighbours, separate, perceived_velocity,
+                    perceived_center, 1, particleArrayIndices);
             }
         }
     }
 
     // - Clamp the speed change before putting the new speed in vel2
-
-    if (ruleThree_neighbours > 0) {
-        perceived_velocity /= ruleThree_neighbours;
-        velocity_out += perceived_velocity * rule3Scale;
-    }
-
-    velocity_out += separate * rule2Scale;
-
-    vel2[index] = velocity_out;
+    vel2[index] = ComputeFinalVelocity(index, pos, ruleOne_neighbours,
+        ruleThree_neighbours, separate, perceived_velocity,
+        perceived_center, velocity_out);
 }
 
 __global__ void kernUpdateVelNeighborSearchCoherent(
