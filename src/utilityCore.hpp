@@ -33,6 +33,12 @@ extern void printCudaMat4(const cudaMat4 &m);
 extern std::string convertIntToString(int number);
 extern std::istream& safeGetline(std::istream& is, std::string& t); //Thanks to http://stackoverflow.com/a/6089413
 
+    template <class T>
+    T divup(T size, T div)
+    {
+        return (size + div - 1) / div;
+    }
+
 //-----------------------------
 //-------GLM Printers----------
 //-----------------------------
