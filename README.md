@@ -31,6 +31,9 @@ Project 1 - Flocking**
   <b>Figure 2:</b> Coherent Grids with 10000 Boids
 </p>
 
+## Extra Credit: Grid-Looping Optimization
+To enable this setting, you can just set "GridLoopingOptimization==1".
+
 ## Performance Analysis
 I turned off Vertical Sync and recorded the FPS after it became quite stable.
 
