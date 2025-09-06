@@ -413,15 +413,8 @@ __global__ void kernIdentifyCellStartEnd(int N, int *particleGridIndices,
   }
   
 }
-__device__ glm::vec3 computeVelocityChangeScattered(int N, int startIndex, int endIndex, int iSelf, const glm::vec3* pos, const glm::vec3* vel) {
-    glm::vec3 changedVelocity = vel[iSelf];
-
-    glm::vec3 percievedCenter = glm::vec3(0.0f, 0.0f, 0.0f);
-    glm::vec3 c = glm::vec3(0.0f, 0.0f, 0.0f);
-    glm::vec3 percievedVelocity = glm::vec3(0.0f, 0.0f, 0.0f);
-    glm::vec3 curPos = pos[iSelf];
-    int rule1Neighbors = 0;
-    int rule3Neighbors = 0;
+__device__ void rule1Scattered(int startIndex, int endIndex, int iSelf, int& rule1Neighbors, glm::vec3& percievedCenter, const glm::vec3* pos)
+{
     for (int i = startIndex; i <= endIndex; i++)
     {
         if (i != iSelf)
@@ -432,11 +425,31 @@ __device__ glm::vec3 computeVelocityChangeScattered(int N, int startIndex, int e
                 rule1Neighbors++;
                 percievedCenter += pos[i];
             }
+        }
+    }
+
+}
+__device__ void rule2Scattered(int startIndex, int endIndex, int iSelf, glm::vec3& c, const glm::vec3* pos)
+{
+    for (int i = startIndex; i <= endIndex; i++)
+    {
+        if (i != iSelf)
+        {
             // Rule 2: boids try to stay a distance d away from each other
             if (glm::distance(pos[i], pos[iSelf]) < rule2Distance)
             {
                 c -= pos[i] - pos[iSelf];
             }
+        }
+    }
+
+}
+__device__ void rule3Scattered(int startIndex, int endIndex, int iSelf, int& rule3Neighbors, glm::vec3& percievedVelocity, const glm::vec3* pos, const glm::vec3* vel)
+{
+    for (int i = startIndex; i <= endIndex; i++)
+    {
+        if (i != iSelf)
+        {
             // Rule 3: boids try to match the speed of surrounding boids
             if (glm::distance(pos[i], pos[iSelf]) < rule3Distance)
             {
@@ -444,6 +457,55 @@ __device__ glm::vec3 computeVelocityChangeScattered(int N, int startIndex, int e
                 percievedVelocity += vel[i];
             }
         }
+    }
+
+}
+__device__ glm::vec3 computeVelocityChangeScattered(int N, int gridResolution, unsigned char neighbors, int startingGridIndexX, int startingGridIndexY, int startingGridIndexZ, const int* gridCellStartIndices, const int* gridCellEndIndices, int iSelf, const glm::vec3* pos, const glm::vec3* vel) {
+    glm::vec3 changedVelocity = vel[iSelf];
+
+    glm::vec3 percievedCenter = glm::vec3(0.0f, 0.0f, 0.0f);
+    glm::vec3 c = glm::vec3(0.0f, 0.0f, 0.0f);
+    glm::vec3 percievedVelocity = glm::vec3(0.0f, 0.0f, 0.0f);
+    glm::vec3 curPos = pos[iSelf];
+    int rule1Neighbors = 0;
+    int rule3Neighbors = 0;
+
+    int neigborIndecies[8] = { -1 };
+    //Calculate Index of neighboring cells, and retrieve the boids from them
+    for (int i = 0; i < 8; i++)
+    {
+        int gridIndexX = startingGridIndexX;
+        int gridIndexY = startingGridIndexY;
+        int gridIndexZ = startingGridIndexZ;
+        //x direction
+        if ((i & 1) != 0)
+        {
+            gridIndexX += (neighbors & 1) != 0 ? 1 : -1;
+        
+        }
+        //y direction
+        if ((i & 2) != 0)
+        {
+            gridIndexY += (neighbors & 2) != 0 ? 1 : -1;
+        }
+        //z direction
+        if ((i & 4) != 0)
+        {
+            gridIndexZ += (neighbors & 4) != 0 ? 1 : -1;
+        }
+        //Check if grid index is within parameters
+        if (gridIndexX > -1 && gridIndexX < gridResolution
+            && gridIndexY > -1 && gridIndexY < gridResolution
+            && gridIndexZ > -1 && gridIndexZ < gridResolution
+            )
+        {
+            int gridIndex = gridIndexX + gridIndexY * gridResolution + gridIndexZ * gridResolution * gridResolution;
+            rule1Scattered(gridCellStartIndices[gridIndex], gridCellEndIndices[gridIndex], iSelf, rule1Neighbors, percievedCenter, pos);
+            rule2Scattered(gridCellStartIndices[gridIndex], gridCellEndIndices[gridIndex], iSelf, c, pos);
+            rule3Scattered(gridCellStartIndices[gridIndex], gridCellEndIndices[gridIndex], iSelf, rule3Neighbors, percievedVelocity, pos, vel);
+
+        }
+       
     }
 
     if (rule1Neighbors != 0)
@@ -477,20 +539,38 @@ __global__ void kernUpdateVelNeighborSearchScattered(
   // - Clamp the speed change before putting the new speed in vel2
   int index = (blockIdx.x * blockDim.x) + threadIdx.x;
 
-  int gridIndexX = (int)((pos[index].x - gridMin.x) * inverseCellWidth);
-  int gridIndexY = (int)((pos[index].y - gridMin.y) * inverseCellWidth);
-  int gridIndexZ = (int)((pos[index].z - gridMin.z) * inverseCellWidth);
+  float gridIndexX = ((pos[index].x - gridMin.x) * inverseCellWidth);
+  float gridIndexY = ((pos[index].y - gridMin.y) * inverseCellWidth);
+  float gridIndexZ = ((pos[index].z - gridMin.z) * inverseCellWidth);
 
-  int gridIndex = gridIndexX + gridIndexY * gridResolution + gridIndexZ * gridResolution * gridResolution;
 
-  int startIndex = gridCellStartIndices[gridIndex];
-  int endIndex = dev_gridCellEndIndices[gridIndex];
-  if (startIndex != -1)
+  unsigned char neighbors = 0;
+
+  //Right
+  if (gridIndexX - (int)gridIndexX >= 0.5)
   {
-    glm::vec3 changedVel = computeVelocityChangeScattered(N, startIndex, endIndex, index, pos, vel1);
-    changedVel = glm::clamp(changedVel, -maxSpeed, maxSpeed);
-    vel2[index] = changedVel;
+      neighbors |= 1;
   }
+  //Up
+  if (gridIndexY - (int)gridIndexY >= 0.5)
+  {
+      neighbors |= 2;
+  }
+  //Forwards
+  if (gridIndexZ - (int)gridIndexZ >= 0.5)
+  {
+      neighbors |= 4;
+  }
+
+  gridIndexX = (int)gridIndexX;
+  gridIndexY = (int)gridIndexY;
+  gridIndexZ = (int)gridIndexZ;
+
+  glm::vec3 changedVel = computeVelocityChangeScattered(N, gridResolution, neighbors, gridIndexX, gridIndexY, gridIndexZ,
+      gridCellStartIndices, gridCellEndIndices, index, pos, vel1);
+  changedVel = glm::clamp(changedVel, -maxSpeed, maxSpeed);
+  vel2[index] = changedVel;
+  
   
 }
 
@@ -552,7 +632,16 @@ void Boids::stepSimulationScatteredGrid(float dt) {
   dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
   dim3 fullBlocksPerGridCell((gridCellCount + blockSize - 1) / blockSize);
   kernComputeIndices <<<fullBlocksPerGrid, threadsPerBlock>>>(numObjects, gridSideCount, gridMinimum, gridInverseCellWidth, dev_pos, dev_particleArrayIndices, dev_particleGridIndices);
-  kernResetIntBuffer<<< fullBlocksPerGridCell, threadsPerBlock>>>
+  dev_thrust_particleArrayIndices = thrust::device_ptr<int>(dev_particleArrayIndices);
+  dev_thrust_particleGridIndices = thrust::device_ptr<int>(dev_particleGridIndices);
+  thrust::sort_by_key(dev_thrust_particleGridIndices, dev_thrust_particleGridIndices + gridCellCount, dev_thrust_particleArrayIndices);
+
+  kernResetIntBuffer << < fullBlocksPerGridCell, threadsPerBlock >> > (gridCellCount, dev_gridCellStartIndices, -1);
+  kernResetIntBuffer << < fullBlocksPerGridCell, threadsPerBlock >> > (gridCellCount, dev_gridCellEndIndices, -1);
+  kernIdentifyCellStartEnd << < fullBlocksPerGrid, threadsPerBlock >> > (numObjects, dev_particleGridIndices, dev_gridCellStartIndices, dev_gridCellEndIndices);
+  kernUpdateVelNeighborSearchScattered << < fullBlocksPerGrid, threadsPerBlock >> > (numObjects, gridSideCount, gridMinimum,
+      gridInverseCellWidth, gridCellWidth, dev_gridCellStartIndices, dev_gridCellEndIndices,
+      dev_particleArrayIndices, dev_pos, dev_vel1, dev_vel2);
   
 }
 
