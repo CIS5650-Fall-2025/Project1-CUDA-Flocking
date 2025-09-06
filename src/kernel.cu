@@ -559,15 +559,21 @@ void Boids::stepSimulationScatteredGrid(float dt) {
   // - Unstable key sort using Thrust. A stable sort isn't necessary, but you
   //   are welcome to do a performance comparison.
 
-    dev_thrust_particleGridIndices = thrust::device_ptr<int> (dev_particleGridIndices);
-    dev_thrust_particleArrayIndices = thrust::device_ptr<int> (dev_particleArrayIndices);
+    thrust::device_ptr<int> (dev_particleGridIndices);
+    thrust::device_ptr<int> (dev_particleArrayIndices);
     thrust::sort_by_key(dev_thrust_particleGridIndices, dev_thrust_particleGridIndices + numObjects, dev_thrust_particleArrayIndices);
 
   // - Naively unroll the loop for finding the start and end indices of each
   //   cell's data pointers in the array of boid indices
+
+    // don't think this is right
+    kernResetIntBuffer << <blockSize, threadsPerBlock >> > (gridCellCount, dev_gridCellStartIndices, -1);
+    kernResetIntBuffer << <blockSize, threadsPerBlock >> > (gridCellCount, dev_gridCellEndIndicies, -1);
+
     kernIdentifyCellStartEnd << <blockSize, threadsPerBlock >> > (numObjects, 
         dev_particleGridIndices, dev_gridCellStartIndices, dev_gridCellEndIndices);
-  // - Perform velocity updates using neighbor search
+  
+    // - Perform velocity updates using neighbor search
     kernUpdateVelNeighborSearchScattered << <blockSize, threadsPerBlock >> > (numObjects, 
         gridSideCount, gridMinimum, gridInverseCellWidth, gridCellWidth, dev_gridCellStartIndices,
         dev_gridCellEndIndices, dev_particleArrayIndices, dev_pos, dev_vel1, dev_vel2);
