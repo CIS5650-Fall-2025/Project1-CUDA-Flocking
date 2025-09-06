@@ -540,8 +540,11 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
 * Step the entire N-body simulation by `dt` seconds.
 */
 void Boids::stepSimulationNaive(float dt) {
+
+  int blocks = (numObjects - 1 + blockSize) / blockSize;
+
   // TODO-1.2 - use the kernels you wrote to step the simulation forward in time.
-  kernUpdateVelocityBruteForce<<<blockSize, threadsPerBlock>>>(numObjects, dev_pos, dev_vel1, dev_vel2);
+  kernUpdateVelocityBruteForce<<<blocks, threadsPerBlock>>>(numObjects, dev_pos, dev_vel1, dev_vel2);
 
   // TODO-1.2 ping-pong the velocity buffers
   // ping pong = swapping the buffers 
@@ -550,7 +553,7 @@ void Boids::stepSimulationNaive(float dt) {
   dev_vel2 = dev_vel1;
   dev_vel1 = ptr;
 
-  kernUpdatePos << <blockSize, threadsPerBlock >> > (numObjects, dt, dev_pos, dev_vel1);
+  kernUpdatePos << <blocks, threadsPerBlock >> > (numObjects, dt, dev_pos, dev_vel1);
 }
 
 void Boids::stepSimulationScatteredGrid(float dt) {
@@ -560,7 +563,9 @@ void Boids::stepSimulationScatteredGrid(float dt) {
   // - label each particle with its array index as well as its grid index.
   //   Use 2x width grids.
   
-    kernComputeIndices << <blockSize, threadsPerBlock >> > (numObjects, 
+    int boidsBlocks = (numObjects - 1 + blockSize) / blockSize;
+
+    kernComputeIndices << <boidsBlocks, threadsPerBlock >> > (numObjects,
         gridSideCount, gridMinimum, gridInverseCellWidth, dev_pos, dev_particleArrayIndices,
         dev_particleGridIndices);
 
@@ -575,14 +580,16 @@ void Boids::stepSimulationScatteredGrid(float dt) {
   //   cell's data pointers in the array of boid indices
 
     // don't think this is right
-    kernResetIntBuffer << <blockSize, threadsPerBlock >> > (gridCellCount, dev_gridCellStartIndices, -1);
-    kernResetIntBuffer << <blockSize, threadsPerBlock >> > (gridCellCount, dev_gridCellEndIndices, -1);
+    int cellBlocks = (gridCellCount - 1 + blockSize) / blockSize;
 
-    kernIdentifyCellStartEnd << <blockSize, threadsPerBlock >> > (numObjects, 
+    kernResetIntBuffer << <cellBlocks, threadsPerBlock >> > (gridCellCount, dev_gridCellStartIndices, -1);
+    kernResetIntBuffer << <cellBlocks, threadsPerBlock >> > (gridCellCount, dev_gridCellEndIndices, -1);
+
+    kernIdentifyCellStartEnd << <boidsBlocks, threadsPerBlock >> > (numObjects,
         dev_particleGridIndices, dev_gridCellStartIndices, dev_gridCellEndIndices);
   
     // - Perform velocity updates using neighbor search
-    kernUpdateVelNeighborSearchScattered << <blockSize, threadsPerBlock >> > (numObjects, 
+    kernUpdateVelNeighborSearchScattered << <boidsBlocks, threadsPerBlock >> > (numObjects,
         gridSideCount, gridMinimum, gridInverseCellWidth, gridCellWidth, dev_gridCellStartIndices,
         dev_gridCellEndIndices, dev_particleArrayIndices, dev_pos, dev_vel1, dev_vel2);
   // - Update positions
@@ -591,7 +598,7 @@ void Boids::stepSimulationScatteredGrid(float dt) {
     dev_vel2 = dev_vel1;
     dev_vel1 = ptr;
 
-    kernUpdatePos << <blockSize, threadsPerBlock >> > (numObjects, dt, dev_pos, dev_vel1);
+    kernUpdatePos << <boidsBlocks, threadsPerBlock >> > (numObjects, dt, dev_pos, dev_vel1);
 }
 
 void Boids::stepSimulationCoherentGrid(float dt) {
