@@ -392,12 +392,29 @@ __global__ void kernResetIntBuffer(int N, int *intBuffer, int value) {
   }
 }
 
-__global__ void kernIdentifyCellStartEnd(int N, int *particleGridIndices,
-  int *gridCellStartIndices, int *gridCellEndIndices) {
+__global__ void kernIdentifyCellStartEnd(int N, int* particleGridIndices,
+    int* gridCellStartIndices, int* gridCellEndIndices) {
     // TODO-2.1
     // Identify the start point of each cell in the gridIndices array.
     // This is basically a parallel unrolling of a loop that goes
     // "this index doesn't match the one before it, must be a new cell!"
+
+    int index = (blockIdx.x * blockDim.x) + threadIdx.x;
+    if (index >= N) {
+        return;
+    }
+
+    int curGridIndex = particleGridIndices[index];
+    int prevGridIndex = (index > 0) ? particleGridIndices[index - 1] : -1;
+    int nextGridIndex = (index < (N - 1)) ? particleGridIndices[index + 1] : -1;
+
+    if (curGridIndex != prevGridIndex) {
+        gridCellStartIndices[curGridIndex] = index; 
+    }
+
+    if (curGridIndex != nextGridIndex) {
+        gridCellEndIndices[curGridIndex] = index; 
+    }
 }
 
 __global__ void kernUpdateVelNeighborSearchScattered(
@@ -466,6 +483,13 @@ void Boids::stepSimulationScatteredGrid(float dt) {
   
     // - Naively unroll the loop for finding the start and end indices of each
     //   cell's data pointers in the array of boid indices
+    fullBlocksPerGrid = dim3((gridCellCount + blockSize - 1) / blockSize);
+    kernResetIntBuffer << <fullBlocksPerGrid, blockSize >> > (gridCellCount, dev_gridCellStartIndices, -1); 
+    kernResetIntBuffer << <fullBlocksPerGrid, blockSize >> > (gridCellCount, dev_gridCellEndIndices, -1);
+
+    fullBlocksPerGrid = dim3((numObjects + blockSize - 1) / blockSize);
+    kernIdentifyCellStartEnd << <fullBlocksPerGrid, blockSize >> > (numObjects, dev_particleGridIndices, dev_gridCellStartIndices, dev_gridCellEndIndices); 
+
     // - Perform velocity updates using neighbor search
     // - Update positions
     // - Ping-pong buffers as needed
