@@ -16,6 +16,8 @@
 
 #include <glm/glm.hpp>
 
+#define LOW_R 0
+
 // LOOK-2.1 potentially useful for doing grid-based neighbor search
 #ifndef imax
 #define imax( a, b ) ( ((a) > (b)) ? (a) : (b) )
@@ -170,7 +172,11 @@ void Boids::initSimulation(int N) {
   checkCUDAErrorWithLine("kernGenerateRandomPosArray failed!");
 
   // LOOK-2.1 computing grid params
+#if LOW_R
+  gridCellWidth = std::max(std::max(rule1Distance, rule2Distance), rule3Distance);
+#else
   gridCellWidth = 2.0f * std::max(std::max(rule1Distance, rule2Distance), rule3Distance);
+#endif
   int halfSideCount = (int)(scene_scale / gridCellWidth) + 1;
   gridSideCount = 2 * halfSideCount;
 
@@ -411,9 +417,16 @@ __global__ void kernUpdateVelNeighborSearchScattered(
     glm::vec3 perceived_v(0.0f, 0.0f, 0.0f);
     int cnt_rule1 = 0, cnt_rule3 = 0;
 
-    for (int dx = 0; dx <= 1; dx++) {
-        for (int dy = 0; dy <= 1; dy++) {
-            for (int dz = 0; dz <= 1; dz++) {
+    int s_help;
+#if LOW_R
+    s_help = -1;
+#else
+    s_help = 0;
+#endif
+
+    for (int dx = s_help; dx <= 1; dx++) {
+        for (int dy = s_help; dy <= 1; dy++) {
+            for (int dz = s_help; dz <= 1; dz++) {
                 int nx = (dx * search_dir[0] + grid_pos.x) % gridResolution;
                 int ny = (dy * search_dir[1] + grid_pos.y) % gridResolution;
                 int nz = (dz * search_dir[2] + grid_pos.z) % gridResolution;
@@ -485,10 +498,16 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
     glm::vec3 c(0.0f, 0.0f, 0.0f);
     glm::vec3 perceived_v(0.0f, 0.0f, 0.0f);
     int cnt_rule1 = 0, cnt_rule3 = 0;
+    int s_help;
+#if LOW_R
+    s_help = -1;
+#else
+    s_help = 0;
+#endif
 
-	for (int dz = 0; dz <= 1; dz++) {
-		for (int dy = 0; dy <= 1; dy++) {
-			for (int dx = 0; dx <= 1; dx++) {
+	for (int dz = s_help; dz <= 1; dz++) {
+		for (int dy = s_help; dy <= 1; dy++) {
+			for (int dx = s_help; dx <= 1; dx++) {
                 int nx = (dx * search_dir[0] + grid_pos.x) % gridResolution;
                 int ny = (dy * search_dir[1] + grid_pos.y) % gridResolution;
                 int nz = (dz * search_dir[2] + grid_pos.z) % gridResolution;
