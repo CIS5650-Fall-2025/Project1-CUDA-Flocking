@@ -450,74 +450,95 @@ __global__ void kernUpdateVelNeighborSearchScattered(
     if (index >= N) {
         return;
     }
-
+    
+    // Compute integer and fractional part of the boid's grid indices
     glm::vec3 rel = pos[index] - gridMin;
-    int ix = rel.x * inverseCellWidth;
-    int iy = rel.y * inverseCellWidth;
-    int iz = rel.z * inverseCellWidth;
+    float x = rel.x * inverseCellWidth;
+    float y = rel.y * inverseCellWidth;
+    float z = rel.z * inverseCellWidth;
 
-    int bx = halfDir(rel.x);
-    int by = halfDir(rel.y);
-    int bz = halfDir(rel.z);
-      
+    int ix = (int)floorf(x); 
+    int iy = (int)floorf(y);
+    int iz = (int)floorf(z);
+
+    float fx = x - ix; 
+    float fy = y - iy;
+    float fz = z - iz;
+    
+    // Identify which directions we need to consider for neighbors
+    float R = imax(imax(rule1Distance, rule2Distance), rule3Distance);
+    int needNegX = (fx * cellWidth < R); 
+    int needPosX = (cellWidth - fx * cellWidth < R); 
+    int needNegY = (fy * cellWidth < R);
+    int needPosY = (cellWidth - fy * cellWidth < R);
+    int needNegZ = (fz * cellWidth < R);
+    int needPosZ = (cellWidth - fz * cellWidth < R);
+    
     // - Identify which cells may contain neighbors. This isn't always 8.
-    int gridCellIndex; 
-    glm::vec3 thisPos = pos[index]; 
-    glm::vec3 thisVel = vel1[index]; 
-    glm::vec3 otherPos; 
-    glm::vec3 otherVel; 
-    
-    glm::vec3 rule1Accum(0.0f); 
-    int rule1Count = 0; 
-    glm::vec3 rule3Accum(0.0f); 
-    int rule3Count = 0; 
-    
-    glm::vec3 v1(0.0f); 
+    int gridCellIndex;
+    glm::vec3 thisPos = pos[index];
+    glm::vec3 thisVel = vel1[index];
+    glm::vec3 otherPos;
+    glm::vec3 otherVel;
+
+    glm::vec3 rule1Accum(0.0f);
+    int rule1Count = 0;
+    glm::vec3 rule3Accum(0.0f);
+    int rule3Count = 0;
+
+    glm::vec3 v1(0.0f);
     glm::vec3 v2(0.0f);
     glm::vec3 v3(0.0f);
 
-    for (int mask = 0; mask < 8; ++mask) {
-        int cx = ix + (((mask >> 0) & 1) ? bx : 0);
-        int cy = iy + (((mask >> 1) & 1) ? by : 0);
-        int cz = iz + (((mask >> 2) & 1) ? bz : 0);
+    int otherZ, otherY, otherX; 
+    int rCells = (int)ceilf(R / cellWidth);
+    for (int dz = -rCells * needNegZ; dz <= rCells * needPosZ; ++dz) {
+        otherZ = iz + dz; 
+        if (otherZ < 0 || otherZ >= gridResolution) continue; 
 
-        if (cx < 0 || cx >= gridResolution) continue;
-        if (cy < 0 || cy >= gridResolution) continue;
-        if (cz < 0 || cz >= gridResolution) continue;
-        
-        gridCellIndex = gridIndex3Dto1D(cx, cy, cz, gridResolution); 
-        if (gridCellStartIndices[gridCellIndex] == -1)
-        {
-            continue;
-        }
+        for (int dy = -rCells * needNegY; dy <= rCells * needPosY; ++dy) {
+            otherY = iy + dy; 
+            if (otherY < 0 || otherY >= gridResolution) continue; 
 
-        // - For each cell, read the start/end indices in the boid pointer array.
-        for (int i = gridCellStartIndices[gridCellIndex]; i <= gridCellEndIndices[gridCellIndex]; ++i) {
-            int j = particleArrayIndices[i];
-            if (j == index) continue;
+            for (int dx = -rCells * needNegX; dx <= rCells * needPosX; ++dx) {
+                otherX = ix + dx; 
+                if (otherX < 0 || otherX >= gridResolution) continue; 
 
-            // - Access each boid in the cell and compute velocity change from
-            //   the boids rules, if this boid is within the neighborhood distance.
-            otherPos = pos[j];
-            otherVel = vel1[j];
-            glm::vec3 d = otherPos - thisPos;
-            const float dist2 = glm::dot(d, d);
+                gridCellIndex = gridIndex3Dto1D(otherX, otherY, otherZ, gridResolution);
+                if (gridCellStartIndices[gridCellIndex] == -1)
+                {
+                    continue;
+                }
 
-            // rule 1
-            if (dist2 < rule1Distance * rule1Distance) {
-                rule1Accum += otherPos;
-                ++rule1Count;
-            }
+                // - For each cell, read the start/end indices in the boid pointer array.
+                for (int i = gridCellStartIndices[gridCellIndex]; i <= gridCellEndIndices[gridCellIndex]; ++i) {
+                    int j = particleArrayIndices[i];
+                    if (j == index) continue;
 
-            // rule 2
-            if (dist2 < rule2Distance * rule2Distance) {
-                v2 -= (otherPos - thisPos);
-            }
+                    // - Access each boid in the cell and compute velocity change from
+                    //   the boids rules, if this boid is within the neighborhood distance.
+                    otherPos = pos[j];
+                    otherVel = vel1[j];
+                    glm::vec3 d = otherPos - thisPos;
+                    const float dist2 = glm::dot(d, d);
 
-            // rule 3 
-            if (dist2 < rule3Distance * rule3Distance) {
-                rule3Accum += otherVel;
-                ++rule3Count;
+                    // rule 1
+                    if (dist2 < rule1Distance * rule1Distance) {
+                        rule1Accum += otherPos;
+                        ++rule1Count;
+                    }
+
+                    // rule 2
+                    if (dist2 < rule2Distance * rule2Distance) {
+                        v2 -= (otherPos - thisPos);
+                    }
+
+                    // rule 3 
+                    if (dist2 < rule3Distance * rule3Distance) {
+                        rule3Accum += otherVel;
+                        ++rule3Count;
+                    }
+                }
             }
         }
     }
