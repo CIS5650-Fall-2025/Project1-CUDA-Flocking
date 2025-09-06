@@ -2,7 +2,8 @@
 Project 1 - Flocking**
 
 * Crystal Jin
-  * [LinkedIn](www.linkedin.com/in/xiaoyue-jin), [personal website](xiaoyuejin.com)
+  *  [LinkedIn](https://www.linkedin.com/in/xiaoyue-jin), [personal website](https://xiaoyuejin.com)
+
 * Tested on: Windows 11, i7-14700K @ 3.40GHz, 64GB RAM, NVIDIA GeForce RTX 4080 SUPER
 
 # Performance Analysis Report
