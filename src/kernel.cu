@@ -540,7 +540,9 @@ void Boids::stepSimulationNaive(float dt) {
   // TODO-1.2 ping-pong the velocity buffers
   // ping pong = swapping the buffers 
   // b/c don't want to read/write to same one
-  cudaMemcpy(dev_vel2, dev_vel1, sizeof(glm::vec3) * numObjects, cudaMemcpyDeviceToDevice);
+  glm::vec3* ptr = dev_vel2;
+  dev_vel2 = dev_vel1;
+  dev_vel1 = ptr;
 
   kernUpdatePos << <blockSize, threadsPerBlock >> > (numObjects, dt, dev_pos, dev_vel1);
 }
@@ -559,8 +561,8 @@ void Boids::stepSimulationScatteredGrid(float dt) {
   // - Unstable key sort using Thrust. A stable sort isn't necessary, but you
   //   are welcome to do a performance comparison.
 
-    thrust::device_ptr<int> (dev_particleGridIndices);
-    thrust::device_ptr<int> (dev_particleArrayIndices);
+    dev_thrust_particleGridIndices = thrust::device_ptr<int> (dev_particleGridIndices);
+    dev_thrust_particleArrayIndices = thrust::device_ptr<int> (dev_particleArrayIndices);
     thrust::sort_by_key(dev_thrust_particleGridIndices, dev_thrust_particleGridIndices + numObjects, dev_thrust_particleArrayIndices);
 
   // - Naively unroll the loop for finding the start and end indices of each
@@ -568,7 +570,7 @@ void Boids::stepSimulationScatteredGrid(float dt) {
 
     // don't think this is right
     kernResetIntBuffer << <blockSize, threadsPerBlock >> > (gridCellCount, dev_gridCellStartIndices, -1);
-    kernResetIntBuffer << <blockSize, threadsPerBlock >> > (gridCellCount, dev_gridCellEndIndicies, -1);
+    kernResetIntBuffer << <blockSize, threadsPerBlock >> > (gridCellCount, dev_gridCellEndIndices, -1);
 
     kernIdentifyCellStartEnd << <blockSize, threadsPerBlock >> > (numObjects, 
         dev_particleGridIndices, dev_gridCellStartIndices, dev_gridCellEndIndices);
@@ -579,7 +581,9 @@ void Boids::stepSimulationScatteredGrid(float dt) {
         dev_gridCellEndIndices, dev_particleArrayIndices, dev_pos, dev_vel1, dev_vel2);
   // - Update positions
   // - Ping-pong buffers as needed
-    cudaMemcpy(dev_vel2, dev_vel1, sizeof(glm::vec3) * numObjects, cudaMemcpyDeviceToDevice);
+    glm::vec3* ptr = dev_vel2;
+    dev_vel2 = dev_vel1;
+    dev_vel1 = ptr;
 
     kernUpdatePos << <blockSize, threadsPerBlock >> > (numObjects, dt, dev_pos, dev_vel1);
 }
