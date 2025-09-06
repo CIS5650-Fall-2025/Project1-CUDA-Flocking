@@ -505,9 +505,16 @@ __global__ void kernUpdateVelNeighborSearchScattered(
     }
 
     // - Clamp the speed change before putting the new speed in vel2
-    vel2[index] = ComputeFinalVelocity(index, pos, ruleOne_neighbours,
+
+    glm::vec3 new_vel = ComputeFinalVelocity(index, pos, ruleOne_neighbours,
         ruleThree_neighbours, separate, perceived_velocity,
         perceived_center, velocity_out);
+
+    if (glm::length(new_vel) > maxSpeed) {
+        new_vel = (new_vel / glm::length(new_vel)) * maxSpeed;
+    }
+
+    vel2[index] = new_vel;
 }
 
 __global__ void kernUpdateVelNeighborSearchCoherent(
