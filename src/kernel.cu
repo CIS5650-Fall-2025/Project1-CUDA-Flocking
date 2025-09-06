@@ -403,9 +403,31 @@ __global__ void kernResetIntBuffer(int N, int *intBuffer, int value) {
 __global__ void kernIdentifyCellStartEnd(int N, int *particleGridIndices,
   int *gridCellStartIndices, int *gridCellEndIndices) {
   // TODO-2.1
+    int index = threadIdx.x + (blockIdx.x * blockDim.x);
+    if (index >= N) {
+        return;
+    }
+
   // Identify the start point of each cell in the gridIndices array.
   // This is basically a parallel unrolling of a loop that goes
   // "this index doesn't match the one before it, must be a new cell!"
+
+    int currIndex = particleGridIndices[index];
+
+    // boid can be BOTH the start and the end index of a grid cell if only one there!
+    // edge case
+    if (index == 0) {
+        gridCellStartIndices[currIndex] = index;
+}
+    else if (currIndex > particleGridIndices[index - 1]) {
+        gridCellStartIndices[currIndex] = index;
+        gridCellEndIndices[particleGridIndices[index - 1]] = index-1;
+    }
+
+    // edge case
+    if (index == N - 1) {
+        gridCellEndIndices[currIndex] = index;
+    }
 }
 
 __global__ void kernUpdateVelNeighborSearchScattered(
