@@ -1,12 +1,23 @@
 **University of Pennsylvania, CIS 5650: GPU Programming and Architecture,
 Project 1 - Flocking**
 
-* Crystal Jin
+* Author: Crystal Jin
   *  [LinkedIn](https://www.linkedin.com/in/xiaoyue-jin), [personal website](https://xiaoyuejin.com)
 
 * Tested on: Windows 11, i7-14700K @ 3.40GHz, 64GB RAM, NVIDIA GeForce RTX 4080 SUPER
 
-# Performance Analysis Report
+
+This project implements a parallelized **Boids flocking simulation** using **CUDA** and **OpenGL**.  
+The simulation models realistic flocking behavior (cohesion, separation, and alignment) for thousands of boids in 3D space.  
+Several implementations are included for performance comparison:
+- **Naive O(N²) neighbor search**
+- **Scattered uniform grid**
+- **Coherent uniform grid**
+
+The project highlights how spatial data structures and GPU memory access patterns dramatically improve performance, scaling from a few thousand to tens of thousands of boids in real time.
+
+---
+## Performance Analysis Report
 
 ## Methodology
 - **Runtime environment:** CUDA implementation compiled in Release mode, VSync disabled.  
