@@ -404,7 +404,7 @@ __global__ void kernComputeIndices(int N, int gridResolution,
     }
 
     // finding cell in 3D space for boid 
-    glm::vec3 gridIndex_3d = (pos[index] - gridMin) * inverseCellWidth;
+    glm::vec3 gridIndex_3d = floor((pos[index] - gridMin) * inverseCellWidth);
 
     // converting to 1D index
     int gridIndex = gridIndex3Dto1D(gridIndex_3d[0], 
@@ -471,7 +471,7 @@ __global__ void kernUpdateVelNeighborSearchScattered(
     }
 
     // Identify the grid cell that this particle is in
-    glm::vec3 gridIndex_3d = (pos[index] - gridMin) * inverseCellWidth;
+    glm::vec3 gridIndex_3d = floor((pos[index] - gridMin) * inverseCellWidth);
     
     // get distance from the rules!
     float distance = rule1Distance > rule2Distance ? rule1Distance : rule2Distance;
@@ -490,9 +490,9 @@ __global__ void kernUpdateVelNeighborSearchScattered(
 
     // - Identify which cells may contain neighbors. This isn't always 8.
     // get the min/max bounds of each dim using the distance from the rules
-    for (int x = imax(0, (gridIndex_3d[0] - distance) * inverseCellWidth); x <= imin(gridResolution - 1, (gridIndex_3d[0] + distance) * inverseCellWidth); x++) {
-        for (int y = imax(0, (gridIndex_3d[1] - distance) * inverseCellWidth); y <= imin(gridResolution - 1, (gridIndex_3d[1] + distance) * inverseCellWidth); y++) {
-            for (int z = imax(0, (gridIndex_3d[2] - distance) * inverseCellWidth); z <= imin(gridResolution - 1, (gridIndex_3d[2] + distance) * inverseCellWidth); z++) {
+    for (int x = imax(0, (gridIndex_3d[0] - distance)); x <= imin(gridResolution - 1, (gridIndex_3d[0] + distance)); x++) {
+        for (int y = imax(0, (gridIndex_3d[1] - distance)); y <= imin(gridResolution - 1, (gridIndex_3d[1] + distance)); y++) {
+            for (int z = imax(0, (gridIndex_3d[2] - distance)); z <= imin(gridResolution - 1, (gridIndex_3d[2] + distance)); z++) {
 
                 // - For each cell, read the start/end indices in the boid pointer array.
                 int cellIndx = gridIndex3Dto1D(x, y, z, gridResolution);
