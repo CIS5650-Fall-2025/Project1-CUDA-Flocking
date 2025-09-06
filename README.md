@@ -59,15 +59,6 @@ The project highlights how spatial data structures and GPU memory access pattern
 ## Methodology
 - **Runtime environment:** CUDA implementation compiled in Release mode, VSync disabled.  
 - **Measurement:** Framerates (FPS) recorded after ~20 s runtime. Values are estimates due to natural runtime variation.  
-- **Modes tested:**
-  - **Naive:** O(N²) neighbor checks.  
-  - **Scattered uniform grid:** O(N log N + N·k) using Thrust sort + indirect indexing.  
-  - **Coherent uniform grid:** O(N log N + N·k), but with reordered positions/velocities for better memory locality.  
-- **Parameters:**
-  - Default block size = 128 (unless otherwise specified).  
-  - Visualized and non-visualized runs were both measured.  
-  - Block size sweeps (32–1024) performed at N=5000 without visualization.  
-
 ---
 
 ## Results
