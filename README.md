@@ -13,7 +13,7 @@ Project 1 - Flocking**
 
 ### Showcase
 
-![](images/boids-opt-5000.gif)
+![](images/boids-opt-20000.gif)
 
 ![](images/boids-opt-10000.gif)
 
