@@ -27,7 +27,7 @@
 #define COHERENT_GRID 0
 
 // LOOK-1.2 - change this to adjust particle count in the simulation
-const int N_FOR_VIS = 58240; // 58241;?
+const int N_FOR_VIS = 100000; // 58241;?
 const float DT = 0.2f;
 
 /**

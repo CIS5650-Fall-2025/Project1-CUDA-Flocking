@@ -594,8 +594,8 @@ __global__ void kernUpdateVelNeighborSearchScattered(
     ivec3 searchGridBottomLeft = getBottomLeftGridCoord(selfPos - gridMin, cellWidth * 0.5f, inverseCellWidth);
     ivec3 searchGridTopRight = searchGridBottomLeft + ivec3(1, 1, 1);
 
-    searchGridBottomLeft = glm::max(searchGridBottomLeft, ivec3(0, 0, 0));
-    searchGridTopRight = glm::min(searchGridTopRight, ivec3(gridResolution - 1, gridResolution - 1, gridResolution - 1));
+    searchGridBottomLeft = glm::max(searchGridBottomLeft, ivec3(0));
+    searchGridTopRight = glm::min(searchGridTopRight, ivec3(gridResolution - 1));
 
     // get neighbor search locations
     int neighborCell[8];
@@ -684,11 +684,10 @@ void Boids::stepSimulationScatteredGrid(float dt)
 
     // set up
     dim3 numBlocks(utilityCore::divup(numObjects, blockSize));
-    kernResetIntBuffer << <numBlocks, threadsPerBlock >> > (numObjects, dev_gridCellStartIndices, -1);
-    kernResetIntBuffer << <numBlocks, threadsPerBlock >> > (numObjects, dev_gridCellEndIndices, -1);
+    dim3 gridNumBlocks(utilityCore::divup(gridCellCount, blockSize));
 
     // identify the locating grids
-    kernComputeIndices << <numBlocks, threadsPerBlock >> > (numObjects, gridSideCount, gridMinimum,
+    kernComputeIndices <<< numBlocks, threadsPerBlock >>> (numObjects, gridSideCount, gridMinimum,
         gridInverseCellWidth, dev_pos, dev_particleArrayIndices, dev_particleGridIndices);
 
     // sort by grid
@@ -696,16 +695,18 @@ void Boids::stepSimulationScatteredGrid(float dt)
         dev_thrust_particleArrayIndices);
 
     // identify starts and ends
+    kernResetIntBuffer <<< gridNumBlocks, threadsPerBlock >>> (gridCellCount, dev_gridCellStartIndices, -1);
+    kernResetIntBuffer <<< gridNumBlocks, threadsPerBlock >>> (gridCellCount, dev_gridCellEndIndices, -1);
     kernIdentifyCellStartEnd <<< numBlocks, threadsPerBlock >>> (numObjects, dev_particleGridIndices, dev_gridCellStartIndices, dev_gridCellEndIndices);
 
     // update velocity and position
-    kernUpdateVelNeighborSearchScattered <<<numBlocks, threadsPerBlock >>> (numObjects, gridSideCount, gridMinimum,
+    kernUpdateVelNeighborSearchScattered <<< numBlocks, threadsPerBlock >>> (numObjects, gridSideCount, gridMinimum,
         gridInverseCellWidth, gridCellWidth,
         dev_gridCellStartIndices, dev_gridCellEndIndices,
         dev_particleArrayIndices,
         dev_pos, dev_vel1, dev_vel2);
 
-    kernUpdatePos<<< numBlocks, threadsPerBlock >>>(numObjects, dt, dev_pos, dev_vel2);
+    kernUpdatePos <<< numBlocks, threadsPerBlock >>>(numObjects, dt, dev_pos, dev_vel2);
 
     // swap
     std::swap(dev_vel1, dev_vel2);
