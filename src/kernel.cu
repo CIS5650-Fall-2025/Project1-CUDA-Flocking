@@ -662,13 +662,14 @@ void Boids::stepSimulationScatteredGrid(float dt) {
     kernUpdatePos << <boidsBlocks, threadsPerBlock >> > (numObjects, dt, dev_pos, dev_vel1);
 }
 
-__global__ void sortArray (int N, glm::vec3 * array, glm::vec3 * arrayCopy, int * particleArray) {
+__global__ void sortArray (int N, glm::vec3 * pos, glm::vec3 * posCopy, glm::vec3 * vel, glm::vec3 * velCopy, int * particleArray) {
     int index = threadIdx.x + (blockIdx.x * blockDim.x);
     if (index >= N) {
         return;
     }
 
-    arrayCopy[index] = array[particleArray[index]];
+    posCopy[index] = pos[particleArray[index]];
+    velCopy[index] = vel[particleArray[index]];
 }
 
 void Boids::stepSimulationCoherentGrid(float dt) {
@@ -713,8 +714,7 @@ void Boids::stepSimulationCoherentGrid(float dt) {
     //thrust::sort_by_key(dev_thrust_particleGridIndices, dev_thrust_particleGridIndices + numObjects, dev_thrust_pos);
     //thrust::sort_by_key(dev_thrust_particleGridIndices, dev_thrust_particleGridIndices + numObjects, dev_thrust_vel);
 
-    sortArray <<<boidsBlocks, threadsPerBlock >>> (numObjects, dev_pos, dev_pos_coherent, dev_particleArrayIndices);
-    sortArray << <boidsBlocks, threadsPerBlock >> > (numObjects, dev_vel1, dev_vel1_coherent, dev_particleArrayIndices);
+    sortArray <<<boidsBlocks, threadsPerBlock >>> (numObjects, dev_pos, dev_pos_coherent, dev_vel1, dev_vel1_coherent, dev_particleArrayIndices);
 
   // - Perform velocity updates using neighbor search
     kernUpdateVelNeighborSearchCoherent << <boidsBlocks, threadsPerBlock >> > (numObjects,
