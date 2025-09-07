@@ -228,9 +228,31 @@ The neighbourhood search already proves the difference in runtime between the th
 | ![](images/vis_blocksize.png) |
 |:--:|
 
-### Blocksize v. Entire GPU Simulation Runtime (ms)
+### 8 Neighbours v. 27 Neighbours, Neighbour Search (ms)
 
-Again, the table and the graphs reinforce the runtime hypothesis that I mentioned at the beginning is proven to be true. However, I find it curious on how sometimes, the visualised results have an average faster runtime than its non visualised counterpart...
+**# of boids = 5000, no visualization, dt = 0.2**
+
+| # of Neighbours| Scattered Uniform Grid | Coherent Uniform Grid |
+|----------------|------------------------|-----------------------|
+| 8              | ~0.048                 | ~0.039                |
+| 27   (default) | ~0.096                 | ~0.067                |
+
+| ![](images/no_vis_numNeighbours_neighbourSearch.png) |
+|:--:|
+
+## 8 Neighbours v. 27 Neighbours, GPU Simulation Runtime (ms)
+
+**# of boids = 5000, no visualization, dt = 0.2**
+
+| # of Neighbours| Scattered Uniform Grid | Coherent Uniform Grid |
+|----------------|------------------------|-----------------------|
+| 8              | ~0.13                  | ~0.12                 |
+| 27   (default) | ~0.16                  | ~0.14                 |
+
+| ![](images/no_vis_numNeighbours_simulation.png) |
+|:--:|
+
+Again, the table and the graphs reinforce the runtime hypothesis that I mentioned at the beginning is proven to be true.
 
 ### Queries for Runtime
 
@@ -240,4 +262,4 @@ Again, the table and the graphs reinforce the runtime hypothesis that I mentione
 
 3. Yes, the coherent uniform grid consistently has a better runtime than its scattered uniform grid counterpart. This is because the coherent method is constantly sorting the boids such that neighbours will always be near each other according to the cell index, making the individual threads not have to search so much in order to find the boids of influence. According to the data from the tables and the graphs above, coherent timings are around 15% - 25% faster than scattered. 
 
-4. 
+4. Yes, changing the check from 27 cells to 8 cells did indeed decrease the runtime for neighbour search and consequently the entire simulation run. This may be because with 27 cells to check, each boid may be checking neighbours that do not exist, leading to more loop iterations and memory lookup. However, 8 cell neighbour lookup may lead to reduced accuracy in the flocking simulation because instead of also checking z positions, it only checks the horizontal/vertical slice on the x and y axes, meaning that z position adjacent neighbour boids may be missed. So while 8 cell neighbour lookup is indeed slightly faster, it is not necessarily more efficient. 

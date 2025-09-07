@@ -507,6 +507,54 @@ __global__ void kernUpdateVelNeighborSearchScattered(
     glm::vec3 currVel = vel1[index];
     glm::vec3 gridPos = glm::floor((currPos - gridMin) * inverseCellWidth);
 
+    // 8 neighbours.
+    //for (int x = imax(gridPos.x - 1, 0); x < imin(gridPos.x + 1, gridResolution - 1); x++) {
+    //    for (int y = imax(gridPos.y - 1, 0); y < imin(gridPos.y + 1, gridResolution - 1); y++) {
+    //        int currGridIdx = gridIndex3Dto1D(x, y, gridPos.z, gridResolution);
+    //        if (currGridIdx < 0 || currGridIdx >= pow(gridResolution, 3)) {
+    //            continue;
+    //        }
+
+    //        int startIdx = gridCellStartIndices[currGridIdx];
+    //        int endIdx = gridCellEndIndices[currGridIdx];
+
+    //        if (startIdx == -1 || endIdx == -1)
+    //        {
+    //            continue;
+    //        }
+
+    //        for (int i = startIdx; i <= endIdx; i++) {
+    //            // Current neighbouring cell.
+    //            int currBoidIdx = particleArrayIndices[i];
+
+    //            if (currBoidIdx == boidIdx) {
+    //                continue;
+    //            }
+
+    //            // Get dist for every other boid and curr boid.
+    //            float dist = glm::distance(pos[currBoidIdx], currPos);
+    //            // Rule 1 calc.
+    //            if (dist < rule1Distance)
+    //            {
+    //                perceived_center += pos[currBoidIdx];
+    //                numNeighboursRule1++;
+    //            }
+    //            //Rule 2 calc.
+    //            if (dist < rule2Distance)
+    //            {
+    //                c -= pos[currBoidIdx] - currPos;
+    //            }
+    //            // Rule 3 calc.
+    //            if (dist < rule3Distance)
+    //            {
+    //                perceived_velocity += vel1[currBoidIdx];
+    //                numNeighboursRule3++;
+    //            }
+    //        }
+    //    }
+    //}
+
+    // 27 neighbours.
     for (int x = imax(gridPos.x - 1, 0); x < imin(gridPos.x + 1, gridResolution - 1); x++) {
         for (int y = imax(gridPos.y - 1, 0); y < imin(gridPos.y + 1, gridResolution - 1); y++) {
             for (int z = imax(gridPos.z - 1, 0); z < imin(gridPos.z + 1, gridResolution - 1); z++) {
@@ -612,6 +660,53 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
     glm::vec3 currPos = pos[index];
     glm::vec3 gridPos = glm::floor((currPos - gridMin) * inverseCellWidth);
 
+    // 8 neighbours.
+    //for (int x = imax(gridPos.x - 1, 0); x < imin(gridPos.x + 1, gridResolution - 1); x++) {
+    //    for (int y = imax(gridPos.y - 1, 0); y < imin(gridPos.y + 1, gridResolution - 1); y++) {
+    //        int currGridIdx = gridIndex3Dto1D(x, y, gridPos.z, gridResolution);
+
+    //        if (currGridIdx < 0 || currGridIdx >= pow(gridResolution, 3)) {
+    //            continue;
+    //        }
+
+    //        int startIdx = gridCellStartIndices[currGridIdx];
+    //        int endIdx = gridCellEndIndices[currGridIdx];
+
+    //        if (startIdx == -1 || endIdx == -1)
+    //        {
+    //            continue;
+    //        }
+
+    //        for (int i = startIdx; i <= endIdx; i++) {
+    //            // I is current neighbour cell's index.
+    //            if (i == index) {
+    //                continue;
+    //            }
+
+    //            // Get dist for every other boid and curr boid.
+    //            float dist = glm::distance(currPos, pos[i]);
+    //            // Rule 1 calc.
+    //            if (dist < rule1Distance)
+    //            {
+    //                perceived_center += pos[i];
+    //                numNeighboursRule1++;
+    //            }
+    //            //Rule 2 calc.
+    //            if (dist < rule2Distance)
+    //            {
+    //                c -= pos[i] - currPos;
+    //            }
+    //            // Rule 3 calc.
+    //            if (dist < rule3Distance)
+    //            {
+    //                perceived_velocity += vel1[i];
+    //                numNeighboursRule3++;
+    //            }
+    //        }
+    //    }
+    //}
+
+    // 27 neighbours.
     for (int x = imax(gridPos.x - 1, 0); x < imin(gridPos.x + 1, gridResolution - 1); x++) {
         for (int y = imax(gridPos.y - 1, 0); y < imin(gridPos.y + 1, gridResolution - 1); y++) {
             for (int z = imax(gridPos.z - 1, 0); z < imin(gridPos.z + 1, gridResolution - 1); z++) {
