@@ -13,6 +13,17 @@ Project 1 - Flocking**
 
 In this project, I implemented a flocking simulation based on the Reynolds Boids algorithm that have two levels of optimization.  
 
+The Boids flocking simulation uses the following rules to determine the behavior of each of its agents, also known as boids: 
+- cohesion - boids move towards the perceived center of mass of their neighbors
+- separation - boids avoid getting to close to their neighbors
+- alignment - boids generally try to move with the same direction and speed as their neighbors
+
+I used the pseudocode provided in the instruction.md file, [Conard Parker's notes](http://www.vergenet.net/~conrad/boids/pseudocode.html), and a helpful [2D implementation of the simulation] (https://vimeo.com/181547860) in order to create the naive approach. This approach is not optimal due to checking every single other boid in the solution space to determine the velocity of the current boid. 
+
+The first level of optimization, creating a uniform spatial grid, improves upon the naive approach. Within this method, the boids are associated with cells in a grid and only neighboring boids in neighboring grid cells are considered when calculating the velocity. 
+
+The second level of optimization, creating a coherent uniform grid, takes the above approach and eliminates a lookup. This lookup was necessary in order to find which boids were in which cells due to the cells having been sorted based on the grid cell number. The lookup was eliminated by sorting the position and velocity arrays in the same manner and thus being able to directly access these arrays.
+
 ## Performance Analysis 
 ![blocksizevsframerate](https://github.com/thumun/Project1-CUDA-Flocking/blob/main/images/blocksizevsframerate.png)
 This chart shows how as the block size increases, the frame rate drops however the optimal block size appears to be 128 or 32 which can be seen by the little spike. 
@@ -26,14 +37,14 @@ This chart is the same as above however there is no visualization. The general t
 ## Responses 
 For each implementation, how does changing the number of boids affect performance? Why do you think this is?
 - ***Naive implementation***: In this, implementation, increasing the number of boids drastically decreases the performance which can be seen by the dramatic loss in framerate from 600 when there were only 2000 boids to only 14 when there were 100,000 (in the visualization scenario). This is due to having to check all other boids in the solution space in order to calculate each boid's velocity.
-- ***Uniform implementation***: In this implementation, increasing the number of boids does lower the frame rate (as expected) but the amount it is lower is much better in comparison to the naive method. This is due to the optimization only considering boids that are neighboring and not looking at the complete solution space. (A more thorough explanation can be found in the implementation explanation above.) 
-- ***Uniform Coherent implementation***: In this implementation, increasing the number of boids does lower the frame rate (as expected) but it is noticeably different than the uniform variant-at least in the case of no visualization. This is due to cutting out the middle man (a lookup into an array). (A more thorough explanation can be found in the implementation explanation above.) 
+- ***Uniform implementation***: In this implementation, increasing the number of boids does lower the frame rate (as expected) but the amount it is lower is much better in comparison to the naive method. This is due to the optimization only considering boids that are neighboring and not looking at the complete solution space.
+- ***Uniform Coherent implementation***: In this implementation, increasing the number of boids does lower the frame rate (as expected) but it is noticeably different than the uniform variant-at least in the case of no visualization. This is due to cutting out the middle man (a lookup into an array).
   
 For each implementation, how does changing the block count and block size affect performance? Why do you think this is?
 - In general for each implementation, as the block size goes down the performance gets worse. In the naive case, there is not a noticeable change due how low it already is in the start but this can be seen in the two optimizations. I believe this is due to not using the warps to their full potential or due to not having enough registers for the data which may result in stalls. 
 
 For the coherent uniform grid: did you experience any performance improvements with the more coherent uniform grid? Was this the outcome you expected? Why or why not?
-- Yes, there were performance improvements if you compare them generally. This was the outcome I expected as the coherent uniform grid cuts out a lookup to the particlesArrayGrid and instead directlyy access the position and velocity for the neighbor boid. It is interesting to note that the two of them perform similarly until the number of boids becomes quite big. It is also rather odd (in my opinion) that coherent out performs by a rather significant amount for the case where there is 75000 boids. 
+- Yes, there were performance improvements if you compare them generally. This was the outcome I expected as the coherent uniform grid cuts out a lookup to the particlesArrayGrid and instead directly access the position and velocity for the neighbor boid. It is interesting to note that the two of them perform similarly until the number of boids becomes quite big. It is also rather odd (in my opinion) that coherent out performs by a rather significant amount for the case where there is 75000 boids. 
   
 Did changing cell width and checking 27 vs 8 neighboring cells affect performance? Why or why not? Be careful: it is insufficient (and possibly incorrect) to say that 27-cell is slower simply because there are more cells to check!
 - Yes, having a max of 8 neighboring cells was more accurate in getting the proper/true neighboring boids. In the 27 neighboring cells case, I was look at cells that may have been empty/devoid of boids and there may have been boids that are out of range for the rules) which are both a waste of a check. In the 8 cells case, there is logic where there is -1 for invalid indivies which prevents the issue of considering invalid boids. 
