@@ -8,7 +8,7 @@ Project 1 - Flocking**
 ### Results
 ![](boids_output.gif)
 
-Preformance Analysis
+Performance Analysis
 ============================
 I am running my tests with baseline settings of a blockSize = 128 & Number of boids = 10,000.
 I am evaluating FPS and using CUDA events to time the velocity kernel for each implementation as a benchmark.
@@ -28,7 +28,7 @@ While making the cell width bigger could decrease the number of neighboring cell
 the number of boids in each cell inflating each cell and the number of boids it is required to evaluate.
 
 ### Coherent Analysis
-My upper and lower bound tests only saw a 67% decrease in FPS which outpreforms the uniform and naive methods.
+My upper and lower bound tests only saw a 67% decrease in FPS which outperforms the uniform and naive methods.
 I anticipated that this implementation would have the fastest FPS because it made the positions and velocities of boids
 contiguous in memory. This allowed us to change how we accessed these values providing the boid's data with one less array than the uniform grid.
 Each access to global memory is expensive, therefore reducing the amount of reads improves performance.
@@ -37,7 +37,7 @@ Each access to global memory is expensive, therefore reducing the amount of read
 ![](images/results/CoherentVelocityClock(ms)vs.Numberofboids.png)
 
 ### Uniform Grid Analysis
-Similary to the naive algorithm each boid in the simulation must check it's preprocessed grid to look for potential neighbors
+Similarly to the naive algorithm, each boid in the simulation must check it's preprocessed grid to look for potential neighbors
 Increasing N requires an increased number of checks, slowing FPS.
 
 ![](images/results/UniformFPSvs.Numberofboids.png)
