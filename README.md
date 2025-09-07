@@ -129,4 +129,4 @@ The grid-loop optimisation offers a slight boost to performance. The 8-cell heur
 
 ![](images/performance-1v2.png)
 
-To my surprise, with 1 x MaxDist cell width (27 cells to check max), FPS was better across the board than 2 x maxDist cell width (8 cells to check max). This is because even though more cells are examined, each cell holds fewer boids so the heavy inner loops shrink a lot and there are less boids that need to be checked. Also, when cell width is twice the rule distance, there will likely be more boids not within the actual rule distance that we check.
+With 1 x MaxDist cell width (27 cells to check max), FPS was better across the board than 2 x maxDist cell width (8 cells to check max). This is because even though more cells are examined, each cell holds fewer boids so the heavy inner loops shrink a lot and there are less boids that need to be checked. The 8-cell heuristic produces more candidate boids to check although the number of cells is less. When cell width is twice the rule distance, there will likely be more boids not within the actual rule distance that we check.
