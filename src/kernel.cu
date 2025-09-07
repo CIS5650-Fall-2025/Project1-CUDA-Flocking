@@ -104,7 +104,6 @@ int *dev_gridCellEndIndices;   // to this cell?
 thrust::device_ptr<vec3> dev_thrust_pos;
 thrust::device_ptr<vec3> dev_thrust_vel;
 
-
 // new class to help with object management
 template <typename T>
 struct Thrustable
@@ -201,6 +200,7 @@ void Boids::initSimulation(int N) {
 
   // LOOK-2.1 computing grid params
   gridCellWidth = 2.0f * std::max(std::max(rule1Distance, rule2Distance), rule3Distance);
+  std::cout << "cell width:" << gridCellWidth << std::endl;
   int halfSideCount = (int)(scene_scale / gridCellWidth) + 1;
   gridSideCount = 2 * halfSideCount;
 
@@ -494,21 +494,20 @@ __global__ void kernUpdateVelNeighborSearchScattered(
     int zCell = static_cast<int>(floor(dist.z * inverseCellWidth));
     int cellIndex = gridIndex3Dto1D(xCell, yCell, zCell, gridResolution);
 
-    int xhalfSideCount = (int)(dist.x * inverseCellWidth) + 1;
-    int yhalfSideCount = (int)(dist.y * inverseCellWidth) + 1;
-    int zhalfSideCount = (int)(dist.z * inverseCellWidth) + 1;
+    float maxRad = fmax(fmax(rule1Distance, rule2Distance), rule3Distance);
 
     int xAdd;
     int yAdd;
     int zAdd;
 
-    xhalfSideCount % 2 == 1 ? xAdd = 1 : xAdd = -1;
-    yhalfSideCount % 2 == 1 ? yAdd = 1 : yAdd = -1;
-    zhalfSideCount % 2 == 1 ? zAdd = 1 : zAdd = -1;
+    gridIndex3Dto1D(static_cast<int>(floor((dist.x + maxRad) * inverseCellWidth)), yCell, zCell, gridResolution) != cellIndex ? xAdd = 1 : xAdd = -1;
+    gridIndex3Dto1D(xCell, static_cast<int>(floor((dist.y + maxRad) * inverseCellWidth)), zCell, gridResolution) != cellIndex ? yAdd = 1 : yAdd = -1;
+    gridIndex3Dto1D(xCell, yCell, static_cast<int>(floor((dist.z + maxRad) * inverseCellWidth)), gridResolution) != cellIndex ? zAdd = 1 : zAdd = -1;
 
     int xCells[2] = {xCell, xCell + xAdd};
     int yCells[2] = { yCell, yCell + yAdd };
     int zCells[2] = { zCell, zCell + zAdd };
+
 
     vec3 pc = vec3(0);
     vec3 c = vec3(0);
@@ -626,17 +625,15 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
     int zCell = static_cast<int>(floor(dist.z * inverseCellWidth));
     int cellIndex = gridIndex3Dto1D(xCell, yCell, zCell, gridResolution);
 
-    int xhalfSideCount = (int)(dist.x * inverseCellWidth) + 1;
-    int yhalfSideCount = (int)(dist.y * inverseCellWidth) + 1;
-    int zhalfSideCount = (int)(dist.z * inverseCellWidth) + 1;
+    float maxRad = fmax(fmax(rule1Distance, rule2Distance), rule3Distance);
 
     int xAdd;
     int yAdd;
     int zAdd;
 
-    xhalfSideCount % 2 == 1 ? xAdd = 1 : xAdd = -1;
-    yhalfSideCount % 2 == 1 ? yAdd = 1 : yAdd = -1;
-    zhalfSideCount % 2 == 1 ? zAdd = 1 : zAdd = -1;
+    gridIndex3Dto1D(static_cast<int>(floor((dist.x + maxRad) * inverseCellWidth)), yCell, zCell, gridResolution) != cellIndex ? xAdd = 1 : xAdd = -1;
+    gridIndex3Dto1D(xCell, static_cast<int>(floor((dist.y + maxRad) * inverseCellWidth)), zCell, gridResolution) != cellIndex ? yAdd = 1 : yAdd = -1;
+    gridIndex3Dto1D(xCell, yCell, static_cast<int>(floor((dist.z + maxRad) * inverseCellWidth)), gridResolution) != cellIndex ? zAdd = 1 : zAdd = -1;
 
     int xCells[2] = { xCell, xCell + xAdd };
     int yCells[2] = { yCell, yCell + yAdd };
@@ -865,6 +862,9 @@ void Boids::endSimulation() {
   cudaFree(dev_particleGridIndices);
   cudaFree(dev_gridCellStartIndices);
   cudaFree(dev_gridCellEndIndices);
+
+  thrustable_grid_copy1.free();
+  thrustable_grid_copy2.free();
 }
 
 void Boids::unitTest() {
