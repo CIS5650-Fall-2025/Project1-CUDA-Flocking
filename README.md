@@ -30,7 +30,7 @@ Rule 2 distance: 2.0 | Rule 2 strength: 0.1
 Rule 3 distance: 8.0 | Rule 3 strength: 0.1
 
 - **1,000,000 boids**  
-  ![1M boids](images/BOIDS_1028_1000000.gif)
+  ![1M 1028 boids](images/BOIDS_1028_100000.gif)
 
 ---
 Rule 1 distance: 5.0 | Rule 1 strength: 0.01
@@ -38,7 +38,7 @@ Rule 2 distance: 2.0 | Rule 2 strength: 0.1
 Rule 3 distance: 10.0 | Rule 3 strength: 0.1
 
 - **2,000,000 boids**  
-  ![1M boids](images/BOIDS_5210_1000000.gif)
+  ![1M 5210 boids](images/BOIDS_5210_100000.gif)
 
 ---
 
@@ -48,7 +48,7 @@ The average fps was calculated over a 10 second window for each simulation metho
 ![FPS Line Graph](images/FPS_LineGraph_V1.png)
 
 ### FPS Breakdown by Block Size
-![Block Size Graph]images/(FPS_BlockGraph_V1.png)
+![Block Size Graph](images/FPS_BlockGraph_V1.png)
 
 ### FPS Table
 ![FPS Table](images/FPS_Table_V1.png)
