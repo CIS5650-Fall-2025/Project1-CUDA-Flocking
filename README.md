@@ -139,6 +139,10 @@ Additional strength over Scattered: for boids in same cell, memory is consequent
 | ![](images/HW2.3_coherentBoids.gif) |
 |:--:|
 
+#### Some extra .gifs.
+| ![](images/100KBoids_dt0.02_scattered.gif) | ![](images/100KBoids_dt0.02_coherent.gif) |
+|:--:|:--:|
+| *100K boids, dt = 0.02, scattered uniform grid* | *100K boids, dt = 0.02, coherent uniform grid* |
 
 ## Runtime Analysis
 
@@ -172,7 +176,7 @@ For the first set of tests, I timed the neighbour search functions for each of t
 
 The neighbourhood search already proves the difference in runtime between the three methods, with naive search being significantly timed higher than scattered and coherent methods. 
 
-### Number of Boids v. Methods Runtime (ms)
+### Number of Boids v. Entire GPU Simulation Runtime (ms)
 
 **blockSize = 128, no visualization, dt = 0.2**
 
@@ -198,5 +202,42 @@ The neighbourhood search already proves the difference in runtime between the th
 | ![](images/vis_simulation_graph.png) |
 |:--:|
 
+### Blocksize v. Entire GPU Simulation Runtime (ms)
+
+**# of boids = 50000, no visualization, dt = 0.2**
+
+| Blocksize      | Naive | Scattered Uniform Grid | Coherent Uniform Grid |
+|----------------|-------|------------------------|-----------------------|
+| 64             | ~22.1 | ~0.61                  | ~0.51                 |
+| 128  (default) | ~22.9 | ~0.63                  | ~0.52                 |
+| 256            | ~24.1 | ~0.64                  | ~0.52                 |
+| 512            | ~23.3 | ~0.66                  | ~0.56                 |
+
+| ![](images/no_vis_blocksize.png) |
+|:--:|
+
+**# of boids = 50000, visualization, dt = 0.2**
+
+| Blocksize      | Naive | Scattered Uniform Grid | Coherent Uniform Grid |
+|----------------|-------|------------------------|-----------------------|
+| 64             | ~22.2 | ~0.62                  | ~0.48                 |
+| 128  (default) | ~21.8 | ~0.56                  | ~0.53                 |
+| 256            | ~21.6 | ~0.62                  | ~0.53                 |
+| 512            | ~23.7 | ~0.66                  | ~0.54                 |
+
+| ![](images/vis_blocksize.png) |
+|:--:|
+
+### Blocksize v. Entire GPU Simulation Runtime (ms)
+
 Again, the table and the graphs reinforce the runtime hypothesis that I mentioned at the beginning is proven to be true. However, I find it curious on how sometimes, the visualised results have an average faster runtime than its non visualised counterpart...
 
+### Queries for Runtime
+
+1. Changing the number of boids for the implementation naturally increases the runtime for every numerical increase. In the naive method, increasing the number of boids exhibits an exponential increase in the runtime of the simulation, while both scattered and coherent methods exhibit a much, much slower exponential increase of runtime. If you reference the tables and the graphs, we can see that coherent's line runs slightly below scattered method's line consistently, meaning that the rate of change for the coherent method is slightly slower than that of scattered. 
+
+2. Changing the blocksize for each implementation does not experience much drastic change in runtime. Other than some minor variations on each runtime here and there, the overall trend for runtime stays flat, as the tables and the graphs portray. Naive, as always, is significantly higher of runtime than scattered and coherent, and that is to be expected. I notice though that for blocksizes on the extremes (e.g. blockSize = 64 and blockSize = 512), the runtime will increase for all methods of implementation in comparison to blockSize = 128 and blockSize = 256.  
+
+3. Yes, the coherent uniform grid consistently has a better runtime than its scattered uniform grid counterpart. This is because the coherent method is constantly sorting the boids such that neighbours will always be near each other according to the cell index, making the individual threads not have to search so much in order to find the boids of influence. According to the data from the tables and the graphs above, coherent timings are around 15% - 25% faster than scattered. 
+
+4. 
