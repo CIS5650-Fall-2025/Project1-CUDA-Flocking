@@ -562,3 +562,16 @@ xcuserdata
 *.xccheckout
 *.moved-aside
 *.xcuserstate
+/build/
+/bin/
+/lib/
+/x64/
+/Debug/
+/Release/
+/CMakeFiles/
+/CMakeCache.txt
+/cmake_install.cmake
+/.vs/
+/*.user
+/*.vcxproj.user
+/*.pdb
