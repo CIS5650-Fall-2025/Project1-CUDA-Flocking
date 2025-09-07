@@ -573,6 +573,84 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
   // - Access each boid in the cell and compute velocity change from
   //   the boids rules, if this boid is within the neighborhood distance.
   // - Clamp the speed change before putting the new speed in vel2
+
+    int index = (blockIdx.x * blockDim.x) + threadIdx.x;
+    if (index >= N) {
+        return;
+    }
+
+    glm::vec3 my_pos = pos[index];
+    glm::vec3 my_vel = vel1[index];
+
+    glm::vec3 perceived_center(0.0f, 0.0f, 0.0f);
+    glm::vec3 c(0.0f, 0.0f, 0.0f);
+    glm::vec3 perceived_velocity(0.0f, 0.0f, 0.0f);
+    int rule1_neighbors = 0;
+    int rule3_neighbors = 0;
+
+    int3 self_cell = make_int3(
+        floor((my_pos.x - gridMin.x) * inverseCellWidth),
+        floor((my_pos.y - gridMin.y) * inverseCellWidth),
+        floor((my_pos.z - gridMin.z) * inverseCellWidth)
+    );
+
+    for (int z = -1; z <= 1; ++z) {
+        for (int y = -1; y <= 1; ++y) {
+            for (int x = -1; x <= 1; ++x) {
+                int neighbor_cell_x = self_cell.x + x;
+                int neighbor_cell_y = self_cell.y + y;
+                int neighbor_cell_z = self_cell.z + z;
+
+                if (neighbor_cell_x < 0 || neighbor_cell_x >= gridResolution ||
+                    neighbor_cell_y < 0 || neighbor_cell_y >= gridResolution ||
+                    neighbor_cell_z < 0 || neighbor_cell_z >= gridResolution) {
+                    continue;
+                }
+
+                int neighbor_cell_1d = gridIndex3Dto1D(neighbor_cell_x, neighbor_cell_y, neighbor_cell_z, gridResolution);
+                int start = gridCellStartIndices[neighbor_cell_1d];
+                int end = gridCellEndIndices[neighbor_cell_1d];
+
+                if (start != -1) {
+                    for (int i = start; i < end; ++i) {
+                        if (index == i) continue;
+
+                        glm::vec3 neighbor_pos = pos[i];
+                        glm::vec3 neighbor_vel = vel1[i];
+                        float dist = glm::length(my_pos - neighbor_pos);
+
+                        if (dist < rule1Distance) {
+                            perceived_center += neighbor_pos;
+                            rule1_neighbors++;
+                        }
+                        if (dist < rule2Distance) {
+                            c -= (neighbor_pos - my_pos);
+                        }
+                        if (dist < rule3Distance) {
+                            perceived_velocity += neighbor_vel;
+                            rule3_neighbors++;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    glm::vec3 vel_change(0.0f, 0.0f, 0.0f);
+
+    if (rule1_neighbors > 0) {
+        vel_change += (perceived_center / (float)rule1_neighbors - my_pos) * rule1Scale;
+    }
+    vel_change += c * rule2Scale;
+    if (rule3_neighbors > 0) {
+        vel_change += (perceived_velocity / (float)rule3_neighbors) * rule3Scale;
+    }
+
+    glm::vec3 new_vel = my_vel + vel_change;
+    if (glm::length(new_vel) > maxSpeed) {
+        new_vel = glm::normalize(new_vel) * maxSpeed;
+    }
+    vel2[index] = new_vel;
 }
 
 /**
@@ -639,6 +717,8 @@ void Boids::stepSimulationCoherentGrid(float dt) {
   // - Perform velocity updates using neighbor search
   // - Update positions
   // - Ping-pong buffers as needed. THIS MAY BE DIFFERENT FROM BEFORE.
+
+
 }
 
 void Boids::endSimulation() {
