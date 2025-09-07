@@ -37,11 +37,15 @@ Each access to global memory is expensive, therefore reducing the amount of read
 ![](images/results/CoherentVelocityClock(ms)vs.Numberofboids.png)
 
 ### Uniform Grid Analysis
+Similary to the naive algorithm each boid in the simulation must check it's preprocessed grid to look for potential neighbors
+Increasing N requires an increased number of checks, slowing FPS.
+
 ![](images/results/UniformFPSvs.NumberofBoids.png)
 ![](images/results/UniformVelocityClock(ms)vs.Numberofboids.png)
 
 ### Naive Flocking Analysis
-The naive algorithm checks each boid in the simulation, increasing N requires and increased number of checks, slowing FPS.
+The naive algorithm checks each boid in the simulation as a potential neighbor.
+Increasing N requires an increased number of checks, slowing FPS.
 
 ![](images/results/NaiveFPSvs.NumberofBoids.png)
 ![](images/results/NaiveVelocityClock(ms)vs.Numberofboids.png)
