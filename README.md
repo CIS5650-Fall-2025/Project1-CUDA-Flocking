@@ -5,6 +5,12 @@ Project 1 - Flocking**
   * [LinkedIn](www.linkedin.com/in/calvin-lieu-91912927b)
 * Tested on: Windows 11, i5-13450HX @ 2.40GHz 16GB, NVIDIA GeForce RTX 5050 Laptop GPU 8GB (Personal)
 
+### Macros
+
+`GRID_LOOP_OPT`: directly above kernUpdateVelNeighborSearchCoherent, set to 1 to use grid loop optimised code
+
+`USE_27_CELL`: directly above kernUpdateVelNeighborSearchCoherent, if setting gridCellWidth to 1 * maxRuleDistance, set this to 1, else 0 for 8-cell heuristic
+
 ### Showcase
 
 ![](images/boids-opt-5000.gif)
