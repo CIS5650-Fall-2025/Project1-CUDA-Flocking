@@ -468,7 +468,7 @@ __global__ void kernIdentifyCellStartEnd(int N, int *particleGridIndices,
 
 __global__ void kernUpdateVelNeighborSearchScattered(
   int N, int gridResolution, glm::vec3 gridMin,
-  float inverseCellWidth, float cellWidth,
+  float inverseCellWidth, float cellWidth, 
   int *gridCellStartIndices, int *gridCellEndIndices,
   int *particleArrayIndices,
   glm::vec3 *pos, glm::vec3 *vel1, glm::vec3 *vel2) {
@@ -508,6 +508,11 @@ __global__ void kernUpdateVelNeighborSearchScattered(
 
                 // - For each cell, read the start/end indices in the boid pointer array.
                 int cellIndx = gridIndex3Dto1D(x, y, z, gridResolution);
+
+                if (gridCellStartIndices[cellIndx] == -1 || gridCellEndIndices[cellIndx] == -1)
+                {
+                    continue;
+                }
 
                 RuleLogic(gridCellStartIndices[cellIndx], gridCellEndIndices[cellIndx], index, pos, 
                     vel1, ruleOne_neighbours, ruleThree_neighbours, separate, perceived_velocity,
@@ -564,10 +569,10 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
 
     glm::vec3 velocity_out = vel1[index];
 
-  //   DIFFERENCE: For best results, consider what order the cells should be
-  //   checked in to maximize the memory benefits of reordering the boids data.
-  // - Access each boid in the cell and compute velocity change from
-  //   the boids rules, if this boid is within the neighborhood distance.
+//   DIFFERENCE: For best results, consider what order the cells should be
+//   checked in to maximize the memory benefits of reordering the boids data.
+// - Access each boid in the cell and compute velocity change from
+//   the boids rules, if this boid is within the neighborhood distance.
 
     // - Identify which cells may contain neighbors. This isn't always 8.
     // get the min/max bounds of each dim using the distance from the rules
@@ -578,6 +583,11 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
                 // - For each cell, read the start/end indices in the boid pointer array.
                 int cellIndx = gridIndex3Dto1D(x, y, z, gridResolution);
 
+                if (gridCellStartIndices[cellIndx] == -1 || gridCellEndIndices[cellIndx] == -1)
+                {
+                    continue;
+                }
+
                 RuleLogic(gridCellStartIndices[cellIndx], gridCellEndIndices[cellIndx], index, pos,
                     vel1, ruleOne_neighbours, ruleThree_neighbours, separate, perceived_velocity,
                     perceived_center);
@@ -585,7 +595,7 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
         }
     }
 
-  // - Clamp the speed change before putting the new speed in vel2
+    // - Clamp the speed change before putting the new speed in vel2
 
     glm::vec3 new_vel = ComputeFinalVelocity(index, pos, ruleOne_neighbours,
         ruleThree_neighbours, separate, perceived_velocity,
@@ -593,7 +603,7 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
 
     if (glm::length(new_vel) > maxSpeed) {
         new_vel = (new_vel / glm::length(new_vel)) * maxSpeed;
-}
+    }
 
     vel2[index] = new_vel;
 }
