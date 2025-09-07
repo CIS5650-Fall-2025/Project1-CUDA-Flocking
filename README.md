@@ -77,6 +77,7 @@ Overall the grid methods scale much better than the naive implementation primari
 ![](images/performance-blocksize.png)
 
 **2. For each implementation, how does changing the block count and block size affect performance? Why do you think this is?**
+
 ### Why **too small** a block size hurts
 
 - **Not enough warps in flight (low occupancy).**  
@@ -100,6 +101,8 @@ Overall the grid methods scale much better than the naive implementation primari
 
 - **Cache / LD/ST pressure clumping.**  
   A huge block can concentrate many similar accesses at once, sometimes creating bursts of L1/L2 pressure, with no other blocks to fill the gaps.
+
+#### Sweet spot: good occupancy, enough warps to hide global-memory latency in neighbor kernels.
 
 Brute Force: Performance was mostly flat because the kernel is already compute/latency bound. Blocksize of 32 was too small and saw a ~20% performance reduction for reasons outlined above. A dip occurred at 1024 perhaps due to lower effective occupancy.
 
