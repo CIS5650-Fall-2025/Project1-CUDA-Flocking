@@ -41,34 +41,17 @@ void checkCUDAError(const char *msg, int line = -1) {
   }
 }
 
-/**
-* Macro to print average frames
-*/
-#define ACCUM_PRINT(TAG, MS)                                                     \
-  do {                                                                           \
-    static double acc_##TAG = 0.0;                                               \
-    static int    n_##TAG   = 0;                                                 \
-    acc_##TAG += (MS);                                                           \
-    n_##TAG   += 1;                                                              \
-    if ((n_##TAG % 60) == 0) {                                                   \
-      double avg = acc_##TAG / n_##TAG;                                          \
-      printf("[%s] avg over %d frames: %.3f ms (%.1f FPS)\n",                    \
-             #TAG, n_##TAG, avg, (avg > 0 ? 1000.0/avg : 0.0));                  \
-      acc_##TAG = 0.0;                                                           \
-      n_##TAG   = 0;                                                             \
-    }                                                                            \
-  } while (0)
-
+//Structs for performance
 struct PerfStat { double total_ms = 0.0; unsigned long long frames = 0ULL; };
 
 static PerfStat g_naive, g_scattered, g_coherent;
 
-static inline void perf_accum(PerfStat& s, float step_ms) {
+static void perf_accum(PerfStat& s, float step_ms) {
   s.total_ms += (double)step_ms;
   s.frames++;
 }
 
-static inline void perf_print(const char* tag, const PerfStat& s) {
+static void perf_print(const char* tag, const PerfStat& s) {
   if (s.frames == 0) return;
   const double avg_ms = s.total_ms / (double)s.frames;
   const double fps = (avg_ms > 0.0) ? (1000.0 / avg_ms) : 0.0;
@@ -81,7 +64,7 @@ static inline void perf_print(const char* tag, const PerfStat& s) {
 *****************/
 
 /*! Block size used for CUDA kernel launch. */
-#define blockSize 32
+#define blockSize 128
 
 // LOOK-1.2 Parameters for the boids algorithm.
 // These worked well in our reference implementation.
@@ -538,10 +521,12 @@ __global__ void kernUpdateVelNeighborSearchScattered(
 }
 
 
+// Toggle to 1 to use grid-loop optimised code
 #ifndef GRID_LOOP_OPT
 #define GRID_LOOP_OPT 1
 #endif
 
+// If setting cell width to 1 * maxRuleDistance, toggle to 1, otherwise 0 for 8-cell heuristic
 #ifndef USE_27_CELL
 #define USE_27_CELL 1
 #endif
@@ -606,6 +591,7 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
   int count1 = 0, count3 = 0;
 
   // Z outer, Y middle, X inner, so cell indices increase by +1 per X step.
+  // Cache friendly traversal
   for (int z = zMin; z <= zMax; z++) {
     int zBase = z * gridResolution * gridResolution;
     for (int y = yMin; y <= yMax; y++) {
@@ -669,8 +655,8 @@ void Boids::stepSimulationNaive(float dt) {
   cudaEventCreate(&evStop);
 
   cudaEventRecord(evStart, 0);
-  dim3 blocks((numObjects + blockSize - 1) / blockSize);
 
+  dim3 blocks((numObjects + blockSize - 1) / blockSize);
 
   // Update velocities
   kernUpdateVelocityBruteForce << <blocks, blockSize >> > (numObjects, dev_pos, dev_vel1, dev_vel2);
@@ -694,7 +680,6 @@ void Boids::stepSimulationNaive(float dt) {
   cudaEventDestroy(evStart);
   cudaEventDestroy(evStop);
 
-  //ACCUM_PRINT(Scattered, step_ms);
 }
 
 void Boids::stepSimulationScatteredGrid(float dt) {
@@ -754,8 +739,6 @@ void Boids::stepSimulationScatteredGrid(float dt) {
   perf_accum(g_scattered, step_ms);
   cudaEventDestroy(evStart);
   cudaEventDestroy(evStop);
-
-  //ACCUM_PRINT(Scattered, step_ms);
 }
 
 void Boids::stepSimulationCoherentGrid(float dt) {
@@ -835,8 +818,6 @@ void Boids::stepSimulationCoherentGrid(float dt) {
   perf_accum(g_coherent, step_ms);
   cudaEventDestroy(evStart);
   cudaEventDestroy(evStop);
-
-  //ACCUM_PRINT(Scattered, step_ms);
 }
 
 void Boids::endSimulation() {
