@@ -142,13 +142,13 @@ Additional strength over Scattered: for boids in same cell, memory is consequent
 
 ## Runtime Analysis
 
-For the first set of tests, I timed the neighbour search functions for each of the three methods, and compared it against number of boids in simulation.
+For the first set of tests, I timed the neighbour search functions for each of the three methods, and compared it against number of boids in simulation. I hypothesise that the naive search will take the longest time by a long shot, while coherent method will only be slightly more optimised than scattered method.
 
 ### Number of Boids v. Time for Neighbour Search (ms)
 
 **blockSize = 128, no visualization, dt = 0.2**
 
-| # of Boids     | Naive | Scattered Uniform Grid | Coherent Uniform Grid0.33 |
+| # of Boids     | Naive | Scattered Uniform Grid | Coherent Uniform Grid |
 |----------------|-------|------------------------|-----------------------|
 | 2000           | ~0.33 | ~0.05                  | ~0.04                 |
 | 5000 (default) | ~0.77 | ~0.08                  | ~0.07                 |
@@ -169,3 +169,34 @@ For the first set of tests, I timed the neighbour search functions for each of t
 
 | ![](images/vis_neighbourSearch_graph.png) |
 |:--:|
+
+The neighbourhood search already proves the difference in runtime between the three methods, with naive search being significantly timed higher than scattered and coherent methods. 
+
+### Number of Boids v. Methods Runtime (ms)
+
+**blockSize = 128, no visualization, dt = 0.2**
+
+| # of Boids     | Naive | Scattered Uniform Grid | Coherent Uniform Grid |
+|----------------|-------|------------------------|-----------------------|
+| 2000           | ~0.43 | ~0.13                  | ~0.13                 |
+| 5000 (default) | ~0.90 | ~0.17                  | ~0.17                 |
+| 10000          | ~1.69 | ~0.23                  | ~0.19                 |
+| 50000          | ~22.9 | ~0.63                  | ~0.52                 |
+
+| ![](images/no_vis_simulation_graph.png) |
+|:--:|
+
+**blockSize = 128, visualization, dt = 0.2**
+
+| # of Boids     | Naive | Scattered Uniform Grid | Coherent Uniform Grid |
+|----------------|-------|------------------------|-----------------------|
+| 2000           | ~0.42 | ~0.13                  | ~0.12                 |
+| 5000 (default) | ~0.90 | ~0.19                  | ~0.18                 |
+| 10000          | ~1.72 | ~0.23                  | ~0.21                 |
+| 50000          | ~21.8 | ~0.56                  | ~0.53                 |
+
+| ![](images/vis_simulation_graph.png) |
+|:--:|
+
+Again, the table and the graphs reinforce the runtime hypothesis that I mentioned at the beginning is proven to be true. However, I find it curious on how sometimes, the visualised results have an average faster runtime than its non visualised counterpart...
+
