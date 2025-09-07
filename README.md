@@ -57,8 +57,6 @@ Performance is worse with very small block sizes. Since 32 threads form a warp, 
 
 ## Scattered vs. Coherent Memory
 
-## Scattered vs. Coherent Memory
-
 In the velocity-update kernel, we access positions and velocities of neighboring boids. The coherent memory strategy improves locality during this computation, which improves overall performance. See the **[Boid Count](#boid-count)** results. 
 
 ## Cell Width and Performance
