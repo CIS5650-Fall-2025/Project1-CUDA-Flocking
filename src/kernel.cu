@@ -592,20 +592,26 @@ __global__ void kernUpdateVelNeighborSearchScattered(
     vec3 selfVelocity = vel1[selfIdx];
 
     ivec3 searchGridBottomLeft = getBottomLeftGridCoord(selfPos - gridMin, cellWidth * 0.5f, inverseCellWidth);
+    ivec3 searchGridTopRight = searchGridBottomLeft + ivec3(1, 1, 1);
+
+    searchGridBottomLeft = glm::max(searchGridBottomLeft, ivec3(0, 0, 0));
+    searchGridTopRight = glm::min(searchGridTopRight, ivec3(gridResolution - 1, gridResolution - 1, gridResolution - 1));
 
     // get neighbor search locations
     int neighborCell[8];
     int neighborCount = 0;
-    for (int z = 0; z <= 1; z++)
+    for (int z = searchGridBottomLeft.z; z <= searchGridTopRight.z; z++)
     {
-        for (int y = 0; y <= 1; y++)
+        for (int y = searchGridBottomLeft.y; y <= searchGridTopRight.y; y++)
         {
-            for (int x = 0; x <=1; x++)
+            for (int x = searchGridBottomLeft.x; x <= searchGridTopRight.x; x++)
             {
-                glm::ivec3 searchGrid = searchGridBottomLeft + glm::ivec3(x, y, z);
-                if (searchGridBottomLeft.x < 0 || searchGridBottomLeft.y < 0 || searchGridBottomLeft.z < 0)
+                int gridIdx = gridIndex3Dto1D(x, y, z, gridResolution);
+                if (gridCellStartIndices[gridIdx] == -1)
+                {
                     continue;
-                int gridIdx = gridIndex3Dto1D(searchGrid.x, searchGrid.y, searchGrid.z, gridResolution);
+                }
+
                 neighborCell[neighborCount++] = gridIdx;
             }   
         }
