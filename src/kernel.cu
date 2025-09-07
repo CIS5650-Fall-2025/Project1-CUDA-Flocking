@@ -651,14 +651,15 @@ void Boids::stepSimulationNaive(float dt) {
   // use the kernels you wrote to step the simulation forward in time.
   kernUpdateVelocityBruteForce<<<blocks, threadsPerBlock>>>(numObjects, dev_pos, dev_vel1, dev_vel2);
 
+  // update positions
+  kernUpdatePos << <blocks, threadsPerBlock >> > (numObjects, dt, dev_pos, dev_vel2);
+
   // ping-pong the velocity buffers
   // ping pong = swapping the buffers 
   // b/c don't want to read/write to same one
   glm::vec3* ptr = dev_vel2;
   dev_vel2 = dev_vel1;
   dev_vel1 = ptr;
-
-  kernUpdatePos << <blocks, threadsPerBlock >> > (numObjects, dt, dev_pos, dev_vel1);
 }
 
 /*
@@ -702,12 +703,12 @@ void Boids::stepSimulationScatteredGrid(float dt) {
         dev_gridCellEndIndices, dev_particleArrayIndices, dev_pos, dev_vel1, dev_vel2);
 
   // - Update positions
+    kernUpdatePos << <boidsBlocks, threadsPerBlock >> > (numObjects, dt, dev_pos, dev_vel2);
+
   // - Ping-pong buffers as needed
     glm::vec3* ptr = dev_vel2;
     dev_vel2 = dev_vel1;
     dev_vel1 = ptr;
-
-    kernUpdatePos << <boidsBlocks, threadsPerBlock >> > (numObjects, dt, dev_pos, dev_vel1);
 }
 
 // creating a copy of vel1 & pos to cut out middle man
@@ -784,12 +785,13 @@ void Boids::stepSimulationCoherentGrid(float dt) {
     placeBackArray << <boidsBlocks, threadsPerBlock >> > (numObjects, dev_pos, dev_pos_coherent, dev_vel2, dev_vel2_coherent, dev_particleArrayIndices);
 
   //   Update positions
-  //   Ping-pong buffers as needed. THIS MAY BE DIFFERENT FROM BEFORE.
+    kernUpdatePos << <boidsBlocks, threadsPerBlock >> > (numObjects, dt, dev_pos, dev_vel2);
+
+  // Ping-pong buffers as needed. THIS MAY BE DIFFERENT FROM BEFORE.
+  // Ping pong afterwards because this should be the last step!! 
     glm::vec3* ptr = dev_vel2;
     dev_vel2 = dev_vel1;
     dev_vel1 = ptr;
-
-    kernUpdatePos << <boidsBlocks, threadsPerBlock >> > (numObjects, dt, dev_pos, dev_vel1);
 }
 
 void Boids::endSimulation() {
