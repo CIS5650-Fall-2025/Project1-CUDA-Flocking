@@ -65,7 +65,7 @@ In the velocity-update kernel, we access positions and velocities of neighboring
 
 | Cell width | 2×ruleDistance | 1×ruleDistance |
 | ---------: | -------------: | -------------: |
-|   Coherent |          4.986 |          3.491 |
+|   Frame Time (ms) |          4.986 |          3.491 |
 
 ### Findings
 
