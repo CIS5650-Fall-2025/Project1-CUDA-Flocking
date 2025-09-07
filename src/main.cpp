@@ -23,11 +23,11 @@
 
 // LOOK-2.1 LOOK-2.3 - toggles for UNIFORM_GRID and COHERENT_GRID
 #define VISUALIZE 1
-#define UNIFORM_GRID 0
-#define COHERENT_GRID 0
+#define UNIFORM_GRID 1
+#define COHERENT_GRID 1
 
 // LOOK-1.2 - change this to adjust particle count in the simulation
-const int N_FOR_VIS = 5000;
+const int N_FOR_VIS = 50000;
 const float DT = 0.2f;
 
 /**
@@ -229,10 +229,15 @@ void initShaders(GLuint * program) {
     Boids::unitTest(); // LOOK-1.2 We run some basic example code to make sure
                        // your CUDA development setup is ready to go.
 
+    double startTime = glfwGetTime();
+    double duration = 10.0;   // run for 10 seconds
+    int totalFrames = 0;
+
     while (!glfwWindowShouldClose(window)) {
       glfwPollEvents();
 
       frame++;
+      totalFrames++;
       double time = glfwGetTime();
 
       if (time - timebase > 1.0) {
@@ -264,6 +269,14 @@ void initShaders(GLuint * program) {
 
       glfwSwapBuffers(window);
       #endif
+
+      // CALCULATE AVERAGE FPS OVER DURATION
+      //if (time - startTime >= duration) {
+      //    double avgFPS = totalFrames / (time - startTime);
+      //    std::cout << "Average FPS over " << duration << " seconds: "
+      //        << avgFPS << std::endl;
+      //    break;
+      //}
     }
     glfwDestroyWindow(window);
     glfwTerminate();
