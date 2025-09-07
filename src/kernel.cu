@@ -170,6 +170,7 @@ void Boids::initSimulation(int N) {
   checkCUDAErrorWithLine("cudaMalloc dev_vel2 failed!");
 
   // LOOK-1.2 - This is a typical CUDA kernel invocation.
+  
   kernGenerateRandomPosArray<<<fullBlocksPerGrid, blockSize>>>(1, numObjects,
     dev_pos, scene_scale);
   checkCUDAErrorWithLine("kernGenerateRandomPosArray failed!");
@@ -311,6 +312,9 @@ __device__ glm::vec3 computeVelocityChange(int N, int iSelf, const glm::vec3 *po
 * TODO-1.2 implement basic flocking
 * For each of the `N` bodies, update its position based on its current velocity.
 */
+
+
+
 __global__ void kernUpdateVelocityBruteForce(int N, glm::vec3 *pos,
   glm::vec3 *vel1, glm::vec3 *vel2) {
   // Compute a new velocity based on pos and vel1
@@ -321,7 +325,13 @@ __global__ void kernUpdateVelocityBruteForce(int N, glm::vec3 *pos,
       return;
   }
   glm::vec3 changedVel = computeVelocityChange(N, index, pos, vel1);
-  changedVel = glm::clamp(changedVel, -maxSpeed, maxSpeed);
+  //Bad, just clamps the individual ones between -1 and 1
+  //changedVel = glm::clamp(changedVel, -maxSpeed, maxSpeed);
+  float speed = glm::length(changedVel);
+  if (speed > maxSpeed) 
+  {
+      changedVel = glm::normalize(changedVel) * maxSpeed;
+  }
   vel2[index] = changedVel;
 
 
@@ -507,6 +517,11 @@ __device__ glm::vec3 computeVelocityChangeScattered(int N, int gridResolution, u
         {
             gridIndexZ += (neighbors & 4) != 0 ? 1 : -1;
         }
+        /*
+        gridIndexX = (gridIndexX + gridResolution) % gridResolution;
+        gridIndexY = (gridIndexY + gridResolution) % gridResolution;
+        gridIndexZ = (gridIndexZ + gridResolution) % gridResolution;
+        */
         //Check if grid index is within parameters
         if (gridIndexX > -1 && gridIndexX < gridResolution
             && gridIndexY > -1 && gridIndexY < gridResolution
@@ -582,21 +597,25 @@ __global__ void kernUpdateVelNeighborSearchScattered(
 
       glm::vec3 changedVel = computeVelocityChangeScattered(N, gridResolution, neighbors, gridIndexX, gridIndexY, gridIndexZ,
           gridCellStartIndices, gridCellEndIndices, particleArrayIndices, index, pos, vel1);
-      changedVel = glm::clamp(changedVel, -maxSpeed, maxSpeed);
+      float speed = glm::length(changedVel);
+      if (speed > maxSpeed)
+      {
+          changedVel = glm::normalize(changedVel) * maxSpeed;
+      }
       vel2[index] = changedVel;
   }
   
 }
 
 
-__device__ void rule1Coherent(int startIndex, int endIndex, int iSelf, int& rule1Neighbors, glm::vec3& percievedCenter, const glm::vec3* pos)
+__device__ void rule1Coherent(int startIndex, int endIndex, int iSelf, int& rule1Neighbors, glm::vec3& percievedCenter, const glm::vec3* pos, const glm::vec3& curPos)
 {
     for (int i = startIndex; i <= endIndex; i++)
     {
         if (i != iSelf)
         {
             // Rule 1: boids fly towards their local perceived center of mass, which excludes themselves
-            if (glm::distance(pos[i], pos[iSelf]) < rule1Distance)
+            if (glm::distance(pos[i], curPos) < rule1Distance)
             {
                 rule1Neighbors++;
                 percievedCenter += pos[i];
@@ -605,29 +624,30 @@ __device__ void rule1Coherent(int startIndex, int endIndex, int iSelf, int& rule
     }
 
 }
-__device__ void rule2Coherent(int startIndex, int endIndex, int iSelf, glm::vec3& c, const glm::vec3* pos)
+__device__ void rule2Coherent(int startIndex, int endIndex, int iSelf, glm::vec3& c, const glm::vec3* pos, const glm::vec3& curPos)
 {
+
     for (int i = startIndex; i <= endIndex; i++)
     {
         if (i != iSelf)
         {
             // Rule 2: boids try to stay a distance d away from each other
-            if (glm::distance(pos[i], pos[iSelf]) < rule2Distance)
+            if (glm::distance(pos[i], curPos) < rule2Distance)
             {
-                c -= pos[i] - pos[iSelf];
+                c -= pos[i] - curPos;
             }
         }
     }
 
 }
-__device__ void rule3Coherent(int startIndex, int endIndex, int iSelf, int& rule3Neighbors, glm::vec3& percievedVelocity, const glm::vec3* pos, const glm::vec3* vel)
+__device__ void rule3Coherent(int startIndex, int endIndex, int iSelf, int& rule3Neighbors, glm::vec3& percievedVelocity, const glm::vec3* pos, const glm::vec3* vel, const glm::vec3& curPos)
 {
     for (int i = startIndex; i <= endIndex; i++)
     {
         if (i != iSelf)
         {
             // Rule 3: boids try to match the speed of surrounding boids
-            if (glm::distance(pos[i], pos[iSelf]) < rule3Distance)
+            if (glm::distance(pos[i], curPos) < rule3Distance)
             {
                 rule3Neighbors++;
                 percievedVelocity += vel[i];
@@ -646,14 +666,14 @@ __device__ glm::vec3 computeVelocityChangeCoherent(int N, int gridResolution, un
     int rule1Neighbors = 0;
     int rule3Neighbors = 0;
 
-    //Pavel TODO: Alter for loop so that it always goes left to right, down to up, back to forward
+    
     //Calculate Index of neighboring cells, and retrieve the boids from them
     for (int i = 0; i < 8; i++)
     {
         int gridIndexX = startingGridIndexX;
         int gridIndexY = startingGridIndexY;
         int gridIndexZ = startingGridIndexZ;
-        //Pavel Example of how code operates
+        //Example of how code operates
         //i = 0.
         //Neighbor to right, don't add anything to gridIndexX
         //Neighbor down, subtract one from gridIndexX to the one below it
@@ -676,23 +696,23 @@ __device__ glm::vec3 computeVelocityChangeCoherent(int N, int gridResolution, un
         if ((i & 2) != 0)
         {
 
-            gridIndexY += (neighbors & 1) != 0 ? 1 : 0;
+            gridIndexY += (neighbors & 2) != 0 ? 1 : 0;
 
         }
         else
         {
-            gridIndexY += (neighbors & 1) != 0 ? 0 : -1;
+            gridIndexY += (neighbors & 2) != 0 ? 0 : -1;
         }
         //z direction
         if ((i & 4) != 0)
         {
 
-            gridIndexZ += (neighbors & 1) != 0 ? 1 : 0;
+            gridIndexZ += (neighbors & 4) != 0 ? 1 : 0;
 
         }
         else
         {
-            gridIndexZ += (neighbors & 1) != 0 ? 0 : -1;
+            gridIndexZ += (neighbors & 4) != 0 ? 0 : -1;
         }
         //Check if grid index is within parameters
         if (gridIndexX > -1 && gridIndexX < gridResolution
@@ -701,9 +721,11 @@ __device__ glm::vec3 computeVelocityChangeCoherent(int N, int gridResolution, un
             )
         {
             int gridIndex = gridIndexX + gridIndexY * gridResolution + gridIndexZ * gridResolution * gridResolution;
-            rule1Coherent(gridCellStartIndices[gridIndex], gridCellEndIndices[gridIndex], iSelf, rule1Neighbors, percievedCenter, pos);
-            rule2Coherent(gridCellStartIndices[gridIndex], gridCellEndIndices[gridIndex], iSelf, c, pos);
-            rule3Coherent(gridCellStartIndices[gridIndex], gridCellEndIndices[gridIndex], iSelf, rule3Neighbors, percievedVelocity, pos, vel);
+            int startIndex = gridCellStartIndices[gridIndex];
+            int endIndex = gridCellEndIndices[gridIndex];
+            rule1Coherent(startIndex, endIndex, iSelf, rule1Neighbors, percievedCenter, pos, curPos);
+            rule2Coherent(startIndex, endIndex, iSelf, c, pos, curPos);
+            rule3Coherent(startIndex, endIndex, iSelf, rule3Neighbors, percievedVelocity, pos, vel, curPos);
 
         }
 
@@ -711,14 +733,13 @@ __device__ glm::vec3 computeVelocityChangeCoherent(int N, int gridResolution, un
 
     if (rule1Neighbors != 0)
     {
-        percievedCenter /= rule1Neighbors;
-        glm::vec3 rule1VelChange = (percievedCenter - pos[iSelf]) * rule1Scale;
-        changedVelocity += (percievedCenter - pos[iSelf]) * rule1Scale;
+        percievedCenter /= (float)rule1Neighbors;
+        changedVelocity += (percievedCenter - curPos) * rule1Scale;
     }
     changedVelocity += c * rule2Scale;
     if (rule3Neighbors != 0)
     {
-        percievedVelocity /= rule3Neighbors;
+        percievedVelocity /= (float)rule3Neighbors;
         changedVelocity += percievedVelocity * rule3Scale;
     }
     return changedVelocity;
@@ -752,17 +773,17 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
         unsigned char neighbors = 0;
 
         //Right
-        if (gridIndexX - (int)gridIndexX >= 0.5)
+        if (gridIndexX - (int)gridIndexX >= 0.5f)
         {
             neighbors |= 1;
         }
         //Up
-        if (gridIndexY - (int)gridIndexY >= 0.5)
+        if (gridIndexY - (int)gridIndexY >= 0.5f)
         {
             neighbors |= 2;
         }
         //Forwards
-        if (gridIndexZ - (int)gridIndexZ >= 0.5)
+        if (gridIndexZ - (int)gridIndexZ >= 0.5f)
         {
             neighbors |= 4;
         }
@@ -773,7 +794,11 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
 
         glm::vec3 changedVel = computeVelocityChangeCoherent(N, gridResolution, neighbors, gridIndexX, gridIndexY, gridIndexZ,
             gridCellStartIndices, gridCellEndIndices, index, pos, vel1);
-        changedVel = glm::clamp(changedVel, -maxSpeed, maxSpeed);
+        float speed = glm::length(changedVel);
+        if (speed > maxSpeed)
+        {
+            changedVel = glm::normalize(changedVel) * maxSpeed;
+        }
         vel2[index] = changedVel;
     }
 }
@@ -851,7 +876,12 @@ void Boids::stepSimulationCoherentGrid(float dt) {
   // - Update positions
   // - Ping-pong buffers as needed. THIS MAY BE DIFFERENT FROM BEFORE.
 
-    
+    float time;
+    cudaEvent_t start, stop;
+
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    cudaEventRecord(start, 0);
     dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
     dim3 fullBlocksPerGridCell((gridCellCount + blockSize - 1) / blockSize);
     kernComputeIndices << <fullBlocksPerGrid, threadsPerBlock >> > (numObjects, gridSideCount, gridMinimum, gridInverseCellWidth, dev_pos, dev_particleArrayIndices, dev_particleGridIndices);
@@ -883,6 +913,14 @@ void Boids::stepSimulationCoherentGrid(float dt) {
     glm::vec3* tempVel = dev_vel2;
     dev_vel2 = dev_vel1;
     dev_vel1 = tempVel;
+    cudaEventRecord(stop, 0);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&time, start, stop);
+
+    
+    printf("Time to generate:  %3.1f ms \n", time);
+
+
     
 }
 
