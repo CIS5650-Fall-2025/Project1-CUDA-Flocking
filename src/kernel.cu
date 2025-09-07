@@ -233,6 +233,79 @@ void Boids::copyBoidsToVBO(float *vbodptr_positions, float *vbodptr_velocities) 
 * stepSimulation *
 ******************/
 
+__device__ glm::vec3 cohesion(int N, int iSelf, const glm::vec3 *pos) {
+    glm::vec3 perceivedCenter{ 0.0f };
+    glm::vec3 posSelf = pos[iSelf];
+	unsigned int neighbourCount = 0;
+    for (int i = 0; i < N; ++i)
+    {
+        glm::vec3 posNeighbour = pos[i];
+        if (i != iSelf)
+        {
+            float distance = glm::distance(posSelf, posNeighbour);
+            if (distance < rule1Distance)
+            {
+                ++neighbourCount;
+                perceivedCenter += posNeighbour;
+            }
+		}
+    }
+
+    if (neighbourCount == 0) {
+        return glm::vec3(0.0f, 0.0f, 0.0f);
+    }
+
+	perceivedCenter /= (float)neighbourCount;
+
+	return (perceivedCenter - posSelf) * rule1Scale;
+}
+
+__device__ glm::vec3 separation(int N, int iSelf, const glm::vec3 *pos) {
+    glm::vec3 c{ 0.0f };
+    glm::vec3 posSelf = pos[iSelf];
+    for (int i = 0; i < N; ++i)
+    {
+        glm::vec3 posNeighbour = pos[i];
+        if (i != iSelf)
+        {
+            float distance = glm::distance(posSelf, posNeighbour);
+            if (distance < rule2Distance)
+            {
+                c -= (posNeighbour - posSelf);
+            }
+        }
+	}
+
+	return c * rule2Scale;
+}
+
+__device__ glm::vec3 alignment(int N, int iSelf, const glm::vec3* pos, const glm::vec3* vel) {
+    glm::vec3 perceivedVel{ 0.0f };
+    glm::vec3 posSelf = pos[iSelf];
+    unsigned int neighbourCount = 0;
+    for (int i = 0; i < N; ++i)
+    {
+        if (i != iSelf)
+        {
+            float distance = glm::distance(posSelf, pos[i]);
+            if (distance < rule3Distance)
+            {
+                ++neighbourCount;
+                perceivedVel += vel[i];
+            }
+        }
+    }
+
+    if (neighbourCount == 0) {
+        return glm::vec3(0.0f, 0.0f, 0.0f);
+    }
+
+    perceivedVel /= (float)neighbourCount;
+
+    return perceivedVel * rule3Scale;
+}
+
+
 /**
 * LOOK-1.2 You can use this as a helper for kernUpdateVelocityBruteForce.
 * __device__ code can be called from a __global__ context
@@ -240,10 +313,18 @@ void Boids::copyBoidsToVBO(float *vbodptr_positions, float *vbodptr_velocities) 
 * in the `pos` and `vel` arrays.
 */
 __device__ glm::vec3 computeVelocityChange(int N, int iSelf, const glm::vec3 *pos, const glm::vec3 *vel) {
+
+    glm::vec3 deltaVel{ 0.0f };
   // Rule 1: boids fly towards their local perceived center of mass, which excludes themselves
+    deltaVel += cohesion(N, iSelf, pos);
+  
   // Rule 2: boids try to stay a distance d away from each other
+    deltaVel += separation(N, iSelf, pos);
+
   // Rule 3: boids try to match the speed of surrounding boids
-  return glm::vec3(0.0f, 0.0f, 0.0f);
+    deltaVel += alignment(N, iSelf, pos, vel);
+    
+    return deltaVel;
 }
 
 /**
@@ -375,11 +456,11 @@ void Boids::stepSimulationNaive(float dt) {
     kernUpdateVelocityBruteForce << <fullBlocksPerGrid, blockSize >> > (numObjects, dev_pos
 		, dev_vel1, dev_vel2);
 
+    // Update positions
+    kernUpdatePos << <fullBlocksPerGrid, blockSize >> > (numObjects, dt, dev_pos, dev_vel2);
+
     // TODO-1.2 ping-pong the velocity buffers
     std::swap(dev_vel1, dev_vel2);
-
-	// Update positions
-    kernUpdatePos << <fullBlocksPerGrid, blockSize >> > (numObjects, dt, dev_pos, dev_vel1);
 }
 
 void Boids::stepSimulationScatteredGrid(float dt) {
