@@ -234,73 +234,6 @@ void Boids::copyBoidsToVBO(float *vbodptr_positions, float *vbodptr_velocities) 
 * stepSimulation *
 ******************/
 
-__device__ glm::vec3 computeRule1(int N, int iSelf, const glm::vec3* pos, const glm::vec3* vel) {
-    glm::vec3 perceivedCenter{};
-    glm::vec3 iPos = pos[iSelf];
-    int neighbors = 0;
-
-    for (int i = 0; i < N; i++) {
-        if (i == iSelf) {
-            continue;
-        }
-        glm::vec3 oPos = pos[i];
-        if (glm::distance(iPos, oPos) < rule1Distance) {
-            perceivedCenter += oPos;
-            neighbors++;
-        }
-    }
-
-
-
-    if (neighbors == 0) {
-        return glm::vec3();
-    }
-
-    perceivedCenter /= neighbors;
-
-    return perceivedCenter - iPos;
-}
-
-__device__ glm::vec3 computeRule2(int N, int iSelf, const glm::vec3* pos, const glm::vec3* vel) {
-    glm::vec3 c{};
-    glm::vec3 iPos = pos[iSelf];
-
-    for (int i = 0; i < N; i++) {
-        if (i == iSelf) {
-            continue;
-        }
-        glm::vec3 oPos = pos[i];
-        if (glm::distance(iPos, oPos) < rule2Distance) {
-            c += iPos - oPos;
-        }
-    }
-    return c;
-}
-__device__ glm::vec3 computeRule3(int N, int iSelf, const glm::vec3* pos, const glm::vec3* vel) {
-    glm::vec3 perceived_v{};
-    glm::vec3 iPos = pos[iSelf];
-    int neighbors = 0;
-
-    for (int i = 0; i < N; i++) {
-        if (i == iSelf) {
-            continue;
-        }
-        glm::vec3 oPos = pos[i];
-        if (glm::distance(iPos, oPos) < rule2Distance) {
-            perceived_v += vel[i];
-            neighbors++;
-        }
-    }
-
-    if (neighbors == 0) {
-        return glm::vec3();
-    }
-
-    perceived_v /= neighbors;
-
-    return perceived_v;
-}
-
 /**
 * LOOK-1.2 You can use this as a helper for kernUpdateVelocityBruteForce.
 * __device__ code can be called from a __global__ context
@@ -311,10 +244,47 @@ __device__ glm::vec3 computeVelocityChange(int N, int iSelf, const glm::vec3 *po
   // Rule 1: boids fly towards their local perceived center of mass, which excludes themselves
   // Rule 2: boids try to stay a distance d away from each other
   // Rule 3: boids try to match the speed of surrounding boids
-    glm::vec3 rule1 = computeRule1(N, iSelf, pos, vel);
-    glm::vec3 rule2 = computeRule2(N, iSelf, pos, vel);
-    glm::vec3 rule3 = computeRule3(N, iSelf, pos, vel);
-    return rule1 * rule1Scale + rule2 * rule2Scale + rule3 * rule3Scale;
+    glm::vec3 sPos = pos[iSelf];
+
+    glm::vec3 perceivedCenter{};
+    int rule1_neighbors = 0;
+
+    glm::vec3 c{};
+
+    glm::vec3 perceived_v{};
+    int rule3_neighbors = 0;
+
+
+    for (int i = 0; i < N; i++) {
+        if (i == iSelf) {
+            continue;
+        }
+        glm::vec3 oPos = pos[i];
+        float oDist = glm::distance(sPos, oPos);
+        if (oDist < rule1Distance) {
+            perceivedCenter += oPos;
+            rule1_neighbors++;
+        }
+        if (oDist < rule2Distance) {
+            c += sPos - oPos;
+        }
+        if (oDist < rule2Distance) {
+            perceived_v += vel[i];
+            rule3_neighbors++;
+        }
+    }
+
+
+    if (rule1_neighbors != 0) {
+        perceivedCenter /= rule1_neighbors;
+        perceivedCenter -= sPos;
+    } 
+
+    if (rule3_neighbors != 0) {
+        perceived_v /= rule3_neighbors;
+    }
+
+    return perceivedCenter * rule1Scale + c * rule2Scale + perceived_v * rule3Scale;
 }
 
 /**
