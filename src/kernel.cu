@@ -59,14 +59,29 @@ void checkCUDAError(const char *msg, int line = -1) {
     }                                                                            \
   } while (0)
 
+struct PerfStat { double total_ms = 0.0; unsigned long long frames = 0ULL; };
 
+static PerfStat g_naive, g_scattered, g_coherent;
+
+static inline void perf_accum(PerfStat& s, float step_ms) {
+  s.total_ms += (double)step_ms;
+  s.frames++;
+}
+
+static inline void perf_print(const char* tag, const PerfStat& s) {
+  if (s.frames == 0) return;
+  const double avg_ms = s.total_ms / (double)s.frames;
+  const double fps = (avg_ms > 0.0) ? (1000.0 / avg_ms) : 0.0;
+  printf("[%s] lifetime avg over %llu frames: %.3f ms (%.1f FPS)\n",
+    tag, (unsigned long long)s.frames, avg_ms, fps);
+}
 
 /*****************
 * Configuration *
 *****************/
 
 /*! Block size used for CUDA kernel launch. */
-#define blockSize 128
+#define blockSize 32
 
 // LOOK-1.2 Parameters for the boids algorithm.
 // These worked well in our reference implementation.
@@ -177,7 +192,7 @@ void Boids::initSimulation(int N) {
   checkCUDAErrorWithLine("kernGenerateRandomPosArray failed!");
 
   // Computing grid params
-  gridCellWidth = 2.0f * std::max(std::max(rule1Distance, rule2Distance), rule3Distance);
+  gridCellWidth = 1.0f * std::max(std::max(rule1Distance, rule2Distance), rule3Distance);
   int halfSideCount = (int)(scene_scale / gridCellWidth) + 1;
   gridSideCount = 2 * halfSideCount;
 
@@ -457,48 +472,26 @@ __global__ void kernUpdateVelNeighborSearchScattered(
   int boidIdx = particleArrayIndices[i];
   glm::vec3 p = pos[boidIdx];
 
-  // Convert position to grid coordinates (float), then to integer cell coords.
-  glm::vec3 rel = (p - gridMin) * inverseCellWidth;
-  int grid_x = imax(0, imin(gridResolution - 1, int(floorf(rel.x))));
-  int grid_y = imax(0, imin(gridResolution - 1, int(floorf(rel.y))));
-  int grid_z = imax(0, imin(gridResolution - 1, int(floorf(rel.z))));
+  // Neighborhood radius (max of 3 rules)
+  const float R = fmaxf(fmaxf(rule1Distance, rule2Distance), rule3Distance);
 
-  // Fractional parts inside the cell to decide which neighbor slab is closer.
-  float frac_x = rel.x - floorf(rel.x);
-  float frac_y = rel.y - floorf(rel.y);
-  float frac_z = rel.z - floorf(rel.z);
-
-  // Choose the "other" candidate cell along each axis (left/right, down/up, back/front)
-  // so we visit at most 2 cells per axis (<= 8 total).
-  int nx = grid_x + ((frac_x >= 0.5f) ? 1 : -1);
-  int ny = grid_y + ((frac_y >= 0.5f) ? 1 : -1);
-  int nz = grid_z + ((frac_z >= 0.5f) ? 1 : -1);
-  nx = imax(0, imin(gridResolution - 1, nx));
-  ny = imax(0, imin(gridResolution - 1, ny));
-  nz = imax(0, imin(gridResolution - 1, nz));
-
-  int xs[2] = { grid_x, nx };
-  int ys[2] = { grid_y, ny};
-  int zs[2] = { grid_z, nz};
-	//check for duplicates
-  int xCount = (nx == grid_x) ? 1 : 2;
-  int yCount = (ny == grid_y) ? 1 : 2;
-  int zCount = (nz == grid_z) ? 1 : 2;
+  // Compute inclusive cell ranges that intersect the sphere of radius R
+  int xMin, xMax, yMin, yMax, zMin, zMax;
+  cellRangeForRadius(p, gridMin, inverseCellWidth, gridResolution, R,
+    xMin, xMax, yMin, yMax, zMin, zMax);
 
   glm::vec3 centre(0), separation(0), averageV(0);
   int count1 = 0, count3 = 0;
 
-  // Visit up to 8 neighbour cells
-  for (int x = 0; x < xCount; x++) {
-    for (int y = 0; y < yCount; y++) {
-	    for (int z = 0; z < zCount; z++) {
-        int cx = xs[x], cy = ys[y], cz = zs[z];
-        // flattened 1D cell index
-        int cell = gridIndex3Dto1D(cx, cy, cz, gridResolution);
-
-        int start = gridCellStartIndices[cell];
+ // Sweep only the needed cells; iterate in cache-friendly order z,y,x
+  for (int z = zMin; z <= zMax; ++z) {
+    int zBase = z * gridResolution * gridResolution;
+    for (int y = yMin; y <= yMax; ++y) {
+      int base = zBase + y * gridResolution + xMin;
+      for (int x = xMin; x <= xMax; ++x, ++base) {
+        int start = gridCellStartIndices[base];
         if (start == -1) continue;
-        int end = gridCellEndIndices[cell];
+        int end = gridCellEndIndices[base];
 
         // Walk all boids in this cell, accumulating rule contributions.
         for (int k = start; k <= end; k++) {
@@ -546,7 +539,11 @@ __global__ void kernUpdateVelNeighborSearchScattered(
 
 
 #ifndef GRID_LOOP_OPT
-#define GRID_LOOP_OPT 0
+#define GRID_LOOP_OPT 1
+#endif
+
+#ifndef USE_27_CELL
+#define USE_27_CELL 1
 #endif
 
 __global__ void kernUpdateVelNeighborSearchCoherent(
@@ -575,34 +572,39 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
 	  int grid_y = imax(0, imin(gridResolution - 1, int(floorf(rel.y))));
 	  int grid_z = imax(0, imin(gridResolution - 1, int(floorf(rel.z))));
 
-	  // Fractional parts inside the cell to decide which neighbor slab is closer.
-	  float frac_x = rel.x - floorf(rel.x);
-	  float frac_y = rel.y - floorf(rel.y);
-	  float frac_z = rel.z - floorf(rel.z);
+		#if USE_27_CELL
+		  xMin = imax(0, grid_x - 1);
+		  xMax = imin(gridResolution - 1, grid_x + 1);
+		  yMin = imax(0, grid_y - 1);
+		  yMax = imin(gridResolution - 1, grid_y + 1);
+		  zMin = imax(0, grid_z - 1);
+		  zMax = imin(gridResolution - 1, grid_z + 1);
+		#else
+		  // 8-cell heuristic (uses fractional offset to pick 1 neighbor per axis)
+		  float frac_x = rel.x - floorf(rel.x);
+		  float frac_y = rel.y - floorf(rel.y);
+		  float frac_z = rel.z - floorf(rel.z);
 
-	  // Choose the "other" candidate cell along each axis (left/right, down/up, back/front)
-	  // so we visit at most 2 cells per axis (<= 8 total).
-	  int nx = grid_x + ((frac_x >= 0.5f) ? 1 : -1);
-	  int ny = grid_y + ((frac_y >= 0.5f) ? 1 : -1);
-	  int nz = grid_z + ((frac_z >= 0.5f) ? 1 : -1);
-	  nx = imax(0, imin(gridResolution - 1, nx));
-	  ny = imax(0, imin(gridResolution - 1, ny));
-	  nz = imax(0, imin(gridResolution - 1, nz));
+		  int nx = grid_x + ((frac_x >= 0.5f) ? 1 : -1);
+		  int ny = grid_y + ((frac_y >= 0.5f) ? 1 : -1);
+		  int nz = grid_z + ((frac_z >= 0.5f) ? 1 : -1);
+		  nx = imax(0, imin(gridResolution - 1, nx));
+		  ny = imax(0, imin(gridResolution - 1, ny));
+		  nz = imax(0, imin(gridResolution - 1, nz));
 
-	  // Determine the inclusive ranges we’ll sweep on each axis.
-	  // (If nx==grid_x, range collapses to one cell on that axis.)
-	  xMin = (nx < grid_x) ? nx : grid_x;
-	  xMax = (nx < grid_x) ? grid_x : nx;
-	  yMin = (ny < grid_y) ? ny : grid_y;
-	  yMax = (ny < grid_y) ? grid_y : ny;
-	  zMin = (nz < grid_z) ? nz : grid_z;
-	  zMax = (nz < grid_z) ? grid_z : nz;
-	#endif
+		  // Turn the chosen neighbor on each axis into inclusive ranges
+		  xMin = (nx < grid_x) ? nx : grid_x;
+		  xMax = (nx < grid_x) ? grid_x : nx;
+		  yMin = (ny < grid_y) ? ny : grid_y;
+		  yMax = (ny < grid_y) ? grid_y : ny;
+		  zMin = (nz < grid_z) ? nz : grid_z;
+		  zMax = (nz < grid_z) ? grid_z : nz;
+		#endif // USE_27_CELL
+	#endif   // GRID_LOOP_OPT
 
   glm::vec3 centre(0), separation(0), averageV(0);
   int count1 = 0, count3 = 0;
 
-  // Visit the (up to) 8 neighbor cells in cache-friendly order:
   // Z outer, Y middle, X inner, so cell indices increase by +1 per X step.
   for (int z = zMin; z <= zMax; z++) {
     int zBase = z * gridResolution * gridResolution;
@@ -688,10 +690,11 @@ void Boids::stepSimulationNaive(float dt) {
   cudaEventSynchronize(evStop);
   float step_ms = 0.f;
   cudaEventElapsedTime(&step_ms, evStart, evStop);
+  perf_accum(g_naive, step_ms);
   cudaEventDestroy(evStart);
   cudaEventDestroy(evStop);
 
-  ACCUM_PRINT(Scattered, step_ms);
+  //ACCUM_PRINT(Scattered, step_ms);
 }
 
 void Boids::stepSimulationScatteredGrid(float dt) {
@@ -748,10 +751,11 @@ void Boids::stepSimulationScatteredGrid(float dt) {
   cudaEventSynchronize(evStop);
   float step_ms = 0.f;
   cudaEventElapsedTime(&step_ms, evStart, evStop);
+  perf_accum(g_scattered, step_ms);
   cudaEventDestroy(evStart);
   cudaEventDestroy(evStop);
 
-  ACCUM_PRINT(Scattered, step_ms);
+  //ACCUM_PRINT(Scattered, step_ms);
 }
 
 void Boids::stepSimulationCoherentGrid(float dt) {
@@ -828,10 +832,11 @@ void Boids::stepSimulationCoherentGrid(float dt) {
   cudaEventSynchronize(evStop);
   float step_ms = 0.f;
   cudaEventElapsedTime(&step_ms, evStart, evStop);
+  perf_accum(g_coherent, step_ms);
   cudaEventDestroy(evStart);
   cudaEventDestroy(evStop);
 
-  ACCUM_PRINT(Scattered, step_ms);
+  //ACCUM_PRINT(Scattered, step_ms);
 }
 
 void Boids::endSimulation() {
@@ -845,6 +850,9 @@ void Boids::endSimulation() {
   cudaFree(dev_posCoherent);
   cudaFree(dev_vel1Coherent);
   cudaFree(dev_vel2Coherent);
+  perf_print("Naive", g_naive);
+  perf_print("Scattered", g_scattered);
+  perf_print("Coherent", g_coherent);
 }
 
 void Boids::unitTest() {
