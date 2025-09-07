@@ -64,6 +64,8 @@ void checkCUDAError(const char *msg, int line = -1) {
 
 #define maxSpeed 1.0f
 
+#define cellScale 2.0f
+
 /*! Size of the starting area in simulation space. */
 #define scene_scale 100.0f
 
@@ -176,7 +178,7 @@ void Boids::initSimulation(int N) {
   checkCUDAErrorWithLine("kernGenerateRandomPosArray failed!");
 
   // LOOK-2.1 computing grid params
-  gridCellWidth = 2.0f * std::max(std::max(rule1Distance, rule2Distance), rule3Distance);
+  gridCellWidth = cellScale * std::max(std::max(rule1Distance, rule2Distance), rule3Distance);
   int halfSideCount = (int)(scene_scale / gridCellWidth) + 1;
   gridSideCount = 2 * halfSideCount;
 
@@ -496,47 +498,88 @@ __device__ glm::vec3 computeVelocityChangeScattered(int N, int gridResolution, u
     int rule3Neighbors = 0;
 
     //Calculate Index of neighboring cells, and retrieve the boids from them
-    for (int i = 0; i < 8; i++)
+    if (cellScale == 2)
     {
-        int gridIndexX = startingGridIndexX;
-        int gridIndexY = startingGridIndexY;
-        int gridIndexZ = startingGridIndexZ;
-        //x direction
-        if ((i & 1) != 0)
+
+
+        for (int i = 0; i < 8; i++)
         {
-            gridIndexX += (neighbors & 1) != 0 ? 1 : -1;
-        
-        }
-        //y direction
-        if ((i & 2) != 0)
-        {
-            gridIndexY += (neighbors & 2) != 0 ? 1 : -1;
-        }
-        //z direction
-        if ((i & 4) != 0)
-        {
-            gridIndexZ += (neighbors & 4) != 0 ? 1 : -1;
-        }
-        /*
-        gridIndexX = (gridIndexX + gridResolution) % gridResolution;
-        gridIndexY = (gridIndexY + gridResolution) % gridResolution;
-        gridIndexZ = (gridIndexZ + gridResolution) % gridResolution;
-        */
-        //Check if grid index is within parameters
-        if (gridIndexX > -1 && gridIndexX < gridResolution
-            && gridIndexY > -1 && gridIndexY < gridResolution
-            && gridIndexZ > -1 && gridIndexZ < gridResolution
-            )
-        {
-            int gridIndex = gridIndexX + gridIndexY * gridResolution + gridIndexZ * gridResolution * gridResolution;
-            rule1Scattered(gridCellStartIndices[gridIndex], gridCellEndIndices[gridIndex], particleArrayIndices, iSelf, rule1Neighbors, percievedCenter, pos);
-            rule2Scattered(gridCellStartIndices[gridIndex], gridCellEndIndices[gridIndex], particleArrayIndices, iSelf, c, pos);
-            rule3Scattered(gridCellStartIndices[gridIndex], gridCellEndIndices[gridIndex], particleArrayIndices, iSelf, rule3Neighbors, percievedVelocity, pos, vel);
+            int gridIndexX = startingGridIndexX;
+            int gridIndexY = startingGridIndexY;
+            int gridIndexZ = startingGridIndexZ;
+            //x direction
+            if ((i & 1) != 0)
+            {
+                gridIndexX += (neighbors & 1) != 0 ? 1 : -1;
+
+            }
+            //y direction
+            if ((i & 2) != 0)
+            {
+                gridIndexY += (neighbors & 2) != 0 ? 1 : -1;
+            }
+            //z direction
+            if ((i & 4) != 0)
+            {
+                gridIndexZ += (neighbors & 4) != 0 ? 1 : -1;
+            }
+            /*
+            gridIndexX = (gridIndexX + gridResolution) % gridResolution;
+            gridIndexY = (gridIndexY + gridResolution) % gridResolution;
+            gridIndexZ = (gridIndexZ + gridResolution) % gridResolution;
+            */
+            //Check if grid index is within parameters
+            if (gridIndexX > -1 && gridIndexX < gridResolution
+                && gridIndexY > -1 && gridIndexY < gridResolution
+                && gridIndexZ > -1 && gridIndexZ < gridResolution
+                )
+            {
+                int gridIndex = gridIndexX + gridIndexY * gridResolution + gridIndexZ * gridResolution * gridResolution;
+                rule1Scattered(gridCellStartIndices[gridIndex], gridCellEndIndices[gridIndex], particleArrayIndices, iSelf, rule1Neighbors, percievedCenter, pos);
+                rule2Scattered(gridCellStartIndices[gridIndex], gridCellEndIndices[gridIndex], particleArrayIndices, iSelf, c, pos);
+                rule3Scattered(gridCellStartIndices[gridIndex], gridCellEndIndices[gridIndex], particleArrayIndices, iSelf, rule3Neighbors, percievedVelocity, pos, vel);
+
+            }
 
         }
-       
     }
+    else if (cellScale == 1)
+    {
+        for (int i = 0; i < 3; i++)
+        {
+            for (int j = 0; j < 3; j++)
+            {
+                for (int k = 0; k < 3; k++)
+                {
+                    int gridIndexX = startingGridIndexX;
+                    int gridIndexY = startingGridIndexY;
+                    int gridIndexZ = startingGridIndexZ;
 
+                    gridIndexX += -1 + i;
+                    gridIndexY += -1 + j;
+                    gridIndexZ += -1 + k;
+                    /*
+                    gridIndexX = (gridIndexX + gridResolution) % gridResolution;
+                    gridIndexY = (gridIndexY + gridResolution) % gridResolution;
+                    gridIndexZ = (gridIndexZ + gridResolution) % gridResolution;
+                    */
+                    //Check if grid index is within parameters
+                    if (gridIndexX > -1 && gridIndexX < gridResolution
+                        && gridIndexY > -1 && gridIndexY < gridResolution
+                        && gridIndexZ > -1 && gridIndexZ < gridResolution
+                        )
+                    {
+                        int gridIndex = gridIndexX + gridIndexY * gridResolution + gridIndexZ * gridResolution * gridResolution;
+                        rule1Scattered(gridCellStartIndices[gridIndex], gridCellEndIndices[gridIndex], particleArrayIndices, iSelf, rule1Neighbors, percievedCenter, pos);
+                        rule2Scattered(gridCellStartIndices[gridIndex], gridCellEndIndices[gridIndex], particleArrayIndices, iSelf, c, pos);
+                        rule3Scattered(gridCellStartIndices[gridIndex], gridCellEndIndices[gridIndex], particleArrayIndices, iSelf, rule3Neighbors, percievedVelocity, pos, vel);
+
+                    }
+                }
+            }
+
+        }
+    }
     if (rule1Neighbors != 0)
     {
         percievedCenter /= rule1Neighbors;
