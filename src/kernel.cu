@@ -1,4 +1,4 @@
-#define GLM_FORCE_CUDA
+ #define GLM_FORCE_CUDA
 
 #include <cuda.h>
 #include "kernel.h"
@@ -15,6 +15,8 @@
 #include <thrust/device_vector.h>
 
 #include <glm/glm.hpp>
+#include <cuda_runtime.h>
+#include <device_launch_parameters.h>
 
 // LOOK-2.1 potentially useful for doing grid-based neighbor search
 #ifndef imax
@@ -252,9 +254,63 @@ __device__ glm::vec3 computeVelocityChange(int N, int iSelf, const glm::vec3 *po
 */
 __global__ void kernUpdateVelocityBruteForce(int N, glm::vec3 *pos,
   glm::vec3 *vel1, glm::vec3 *vel2) {
+    
   // Compute a new velocity based on pos and vel1
   // Clamp the speed
   // Record the new velocity into vel2. Question: why NOT vel1?
+
+    int i = threadIdx.x + (blockIdx.x * blockDim.x);
+
+    glm::vec3 perceivedCenter(0, 0, 0);
+    int nCohesionNeighbors = 0;
+
+    glm::vec3 separationVel(0, 0, 0);
+
+    glm::vec3 perceivedVel(0, 0, 0);
+    int nAlignmentNeighbors = 0;
+
+    for (int j = 0; j < N; j++) {
+        if (i == j) continue;
+
+        float distance = glm::distance(pos[i], pos[j]);
+
+        if (distance < rule1Distance) {
+            nCohesionNeighbors += 1;
+            perceivedCenter += pos[j];
+        }
+
+        if (distance < rule2Distance) {
+            separationVel -= pos[j] - pos[i];
+        }
+
+        if (distance < rule3Distance) {
+            nAlignmentNeighbors += 1;
+            perceivedVel += vel1[j];
+        }
+    }
+
+
+    glm::vec3 newVel = vel1[i];
+        
+    if (nCohesionNeighbors > 0) {
+        perceivedCenter /= nCohesionNeighbors;
+        newVel += (perceivedCenter - pos[i]) * rule1Scale;
+    }
+
+    newVel += separationVel * rule2Scale;
+
+    if (nAlignmentNeighbors > 0) {
+        perceivedVel /= nAlignmentNeighbors;
+        newVel += perceivedVel * rule3Scale;
+    }
+
+
+
+    if (glm::length(newVel) > maxSpeed) {
+        newVel = glm::normalize(newVel) * maxSpeed;
+    }
+
+    vel2[i] = newVel;
 }
 
 /**
@@ -358,7 +414,16 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
 */
 void Boids::stepSimulationNaive(float dt) {
   // TODO-1.2 - use the kernels you wrote to step the simulation forward in time.
+
+    dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
+
+    kernUpdateVelocityBruteForce<<<fullBlocksPerGrid, blockSize>>>(numObjects, dev_pos, dev_vel1, dev_vel2);
+    kernUpdatePos<<<fullBlocksPerGrid, blockSize>>>(numObjects, dt, dev_pos, dev_vel2);
+
   // TODO-1.2 ping-pong the velocity buffers
+    glm::vec3 *t = dev_vel1;
+    dev_vel1 = dev_vel2;
+    dev_vel2 = t;
 }
 
 void Boids::stepSimulationScatteredGrid(float dt) {
