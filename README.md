@@ -7,7 +7,11 @@ Project 1 - Flocking**
 
 ### Project 1: Details 
 
-[fancy picture/gif here!!]
+## Boids Flocking Simulation
+
+| 5k Boids  | 50k Boids  | 100k Boids  |
+| ------------- | ------------- | ------------- |
+| ![5k](https://github.com/thumun/Project1-CUDA-Flocking/blob/main/images/5kcoherent.gif)  | ![50k](https://github.com/thumun/Project1-CUDA-Flocking/blob/main/images/50kcoherent.gif)  | ![100k](https://github.com/thumun/Project1-CUDA-Flocking/blob/main/images/100kcoherent.gif)  |
 
 ## Implementation
 
