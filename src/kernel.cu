@@ -80,9 +80,6 @@ glm::vec3 *dev_pos;
 glm::vec3 *dev_vel1;
 glm::vec3 *dev_vel2;
 
-glm::vec3* dev_pos_coherent;
-glm::vec3* dev_vel1_coherent;
-
 // LOOK-2.1 - these are NOT allocated for you. You'll have to set up the thrust
 // pointers on your own too.
 
@@ -98,6 +95,9 @@ int *dev_gridCellEndIndices;   // to this cell?
 
 // TODO-2.3 - consider what additional buffers you might need to reshuffle
 // the position and velocity data to be coherent within cells.
+glm::vec3* dev_pos_coherent;
+glm::vec3* dev_vel1_coherent;
+glm::vec3* dev_vel2_coherent;
 
 // LOOK-2.1 - Grid parameters based on simulation parameters.
 // These are automatically computed for you in Boids::initSimulation
@@ -169,6 +169,9 @@ void Boids::initSimulation(int N) {
 
   cudaMalloc((void**)&dev_vel1_coherent, N * sizeof(glm::vec3));
   checkCUDAErrorWithLine("cudaMalloc dev_vel1_coherent failed!");
+
+  cudaMalloc((void**)&dev_vel2_coherent, N * sizeof(glm::vec3));
+  checkCUDAErrorWithLine("cudaMalloc dev_vel2_coherent failed!");
 
   // LOOK-1.2 - This is a typical CUDA kernel invocation.
   kernGenerateRandomPosArray<<<fullBlocksPerGrid, blockSize>>>(1, numObjects,
@@ -680,8 +683,22 @@ __global__ void sortArray (int N, glm::vec3 * pos, glm::vec3 * posCopy, glm::vec
         return;
     }
 
-    posCopy[index] = pos[particleArray[index]];
-    velCopy[index] = vel[particleArray[index]];
+    int origIndx = particleArray[index];
+
+    posCopy[index] = pos[origIndx];
+    velCopy[index] = vel[origIndx];
+}
+
+__global__ void placeBackArray(int N, glm::vec3* pos, glm::vec3* posCopy, glm::vec3* vel, glm::vec3* velCopy, int* particleArray) {
+    int index = threadIdx.x + (blockIdx.x * blockDim.x);
+    if (index >= N) {
+        return;
+    }
+
+    int origIndx = particleArray[index];
+
+    pos[origIndx] = posCopy[index];
+    vel[origIndx] = velCopy[index];
 }
 
 void Boids::stepSimulationCoherentGrid(float dt) {
@@ -722,14 +739,17 @@ void Boids::stepSimulationCoherentGrid(float dt) {
   // - Perform velocity updates using neighbor search
     kernUpdateVelNeighborSearchCoherent << <boidsBlocks, threadsPerBlock >> > (numObjects,
         gridSideCount, gridMinimum, gridInverseCellWidth, gridCellWidth, dev_gridCellStartIndices,
-        dev_gridCellEndIndices, dev_pos_coherent, dev_vel1_coherent, dev_vel2);
+        dev_gridCellEndIndices, dev_pos_coherent, dev_vel1_coherent, dev_vel2_coherent);
+  
+    placeBackArray << <boidsBlocks, threadsPerBlock >> > (numObjects, dev_pos, dev_pos_coherent, dev_vel2, dev_vel2_coherent, dev_particleArrayIndices);
+
   // - Update positions
   // - Ping-pong buffers as needed. THIS MAY BE DIFFERENT FROM BEFORE.
     glm::vec3* ptr = dev_vel2;
-    dev_vel2 = dev_vel1_coherent;
-    dev_vel1_coherent = ptr;
+    dev_vel2 = dev_vel1;
+    dev_vel1 = ptr;
 
-    kernUpdatePos << <boidsBlocks, threadsPerBlock >> > (numObjects, dt, dev_pos_coherent, dev_vel1_coherent);
+    kernUpdatePos << <boidsBlocks, threadsPerBlock >> > (numObjects, dt, dev_pos, dev_vel1);
 }
 
 void Boids::endSimulation() {
@@ -744,6 +764,7 @@ void Boids::endSimulation() {
   cudaFree(dev_gridCellEndIndices);
   cudaFree(dev_pos_coherent);
   cudaFree(dev_vel1_coherent);
+  cudaFree(dev_vel2_coherent);
 }
 
 void Boids::unitTest() {
