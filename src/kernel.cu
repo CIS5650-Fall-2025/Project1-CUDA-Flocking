@@ -41,6 +41,17 @@ void checkCUDAError(const char *msg, int line = -1) {
   }
 }
 
+/**
+* Runtime check for kernels function.
+**/
+#define CUDA_CHECK(err) { gpuAssert((err), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char* file, int line) {
+    if (code != cudaSuccess) {
+        fprintf(stderr, "GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+        exit(code);
+    }
+}
+
 
 /*****************
 * Configuration *
@@ -681,15 +692,44 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
 void Boids::stepSimulationNaive(float dt) {
   // TODO-1.2 - use the kernels you wrote to step the simulation forward in time.
   // TODO-1.2 ping-pong the velocity buffers
+    
+    // TIMER FOR RUNTIME TESTING.
+    cudaEvent_t start, stop;
+    float milliseconds = 0.0f;
+
+    CUDA_CHECK(cudaEventCreate(&start));
+    CUDA_CHECK(cudaEventCreate(&stop));
+
+    // Start timing.
+    CUDA_CHECK(cudaEventRecord(start));
+
     dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
+
+    // Time naive neighbour search.
+    cudaEventRecord(start);
 
     kernUpdateVelocityBruteForce << <fullBlocksPerGrid, blockSize >> > (numObjects, dev_pos, dev_vel1, dev_vel2);
     cudaDeviceSynchronize();
+
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    printf("kernUpdateVelocityBruteForce = %f ms\n", milliseconds);
 
     kernUpdatePos << <fullBlocksPerGrid, blockSize >> > (numObjects, dt, dev_pos, dev_vel2);
     cudaDeviceSynchronize();
 
     std::swap(dev_vel1, dev_vel2);
+
+    // Stop timing.
+    CUDA_CHECK(cudaEventRecord(stop));
+    CUDA_CHECK(cudaEventSynchronize(stop));
+    CUDA_CHECK(cudaEventElapsedTime(&milliseconds, start, stop));
+
+    printf("[Naive] stepSimulation time = %f ms\n", milliseconds);
+
+    CUDA_CHECK(cudaEventDestroy(start));
+    CUDA_CHECK(cudaEventDestroy(stop));
 }
 
 void Boids::stepSimulationScatteredGrid(float dt) {
@@ -705,6 +745,17 @@ void Boids::stepSimulationScatteredGrid(float dt) {
   // - Perform velocity updates using neighbor search
   // - Update positions
   // - Ping-pong buffers as needed
+
+    // TIMER FOR RUNTIME TESTING.
+    cudaEvent_t start, stop;
+    float milliseconds = 0.0f;
+
+    CUDA_CHECK(cudaEventCreate(&start));
+    CUDA_CHECK(cudaEventCreate(&stop));
+
+    // Start timing.
+    CUDA_CHECK(cudaEventRecord(start));
+
     dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
     dim3 fullCellsPerGrid((gridCellCount + blockSize - 1) / blockSize);
 
@@ -728,6 +779,9 @@ void Boids::stepSimulationScatteredGrid(float dt) {
         dev_gridCellEndIndices);
     checkCUDAErrorWithLine("kernIdentifyCellStartEnd failed!");
 
+    // Time scattered neighbour search.
+    cudaEventRecord(start);
+
     // Step 5: Update velocities using neighbour search.
     kernUpdateVelNeighborSearchScattered << <fullBlocksPerGrid, blockSize >> > (numObjects, gridSideCount,
         gridMinimum, gridInverseCellWidth,
@@ -737,6 +791,11 @@ void Boids::stepSimulationScatteredGrid(float dt) {
         dev_pos, dev_vel1, dev_vel2);
     checkCUDAErrorWithLine("kernUpdateVelNeighborSearchScattered failed!");
 
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    printf("kernUpdateVelNeighborSearchScattered = %f ms\n", milliseconds);
+
     // Step 6: Update positions based on new velocities.
     kernUpdatePos << <fullBlocksPerGrid, blockSize >> > (numObjects, dt, dev_pos, dev_vel2);
     checkCUDAErrorWithLine("kernUpdatePos failed!");
@@ -744,6 +803,16 @@ void Boids::stepSimulationScatteredGrid(float dt) {
     glm::vec3* temp = dev_vel1;
     dev_vel1 = dev_vel2;
     dev_vel2 = temp;
+
+    // Stop timing.
+    CUDA_CHECK(cudaEventRecord(stop));
+    CUDA_CHECK(cudaEventSynchronize(stop));
+    CUDA_CHECK(cudaEventElapsedTime(&milliseconds, start, stop));
+
+    printf("[Scattered] stepSimulation time = %f ms\n", milliseconds);
+
+    CUDA_CHECK(cudaEventDestroy(start));
+    CUDA_CHECK(cudaEventDestroy(stop));
 }
 
 // Reshuffle pos and vel data.
@@ -788,6 +857,17 @@ void Boids::stepSimulationCoherentGrid(float dt) {
   // - Perform velocity updates using neighbor search
   // - Update positions
   // - Ping-pong buffers as needed. THIS MAY BE DIFFERENT FROM BEFORE.
+
+    // TIMER FOR RUNTIME TESTING.
+    cudaEvent_t start, stop;
+    float milliseconds = 0.0f;
+
+    CUDA_CHECK(cudaEventCreate(&start));
+    CUDA_CHECK(cudaEventCreate(&stop));
+
+    // Start timing.
+    CUDA_CHECK(cudaEventRecord(start));
+
     dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
     dim3 fullCellsPerGrid((gridCellCount + blockSize - 1) / blockSize);
 
@@ -813,6 +893,9 @@ void Boids::stepSimulationCoherentGrid(float dt) {
     // Step 5: Reshuffle data in particles array..
     kernReshuffle << <fullBlocksPerGrid, blockSize >> > (numObjects, dev_particleArrayIndices, dev_pos, dev_vel1, dev_reshuffledPos, dev_reshuffledVel1);
 
+    // Time scattered neighbour search.
+    cudaEventRecord(start);
+
     // Step 6: Update velocities using neighbor search.
     kernUpdateVelNeighborSearchCoherent << <fullBlocksPerGrid, blockSize >> > (numObjects, gridSideCount,
         gridMinimum, gridInverseCellWidth,
@@ -820,6 +903,11 @@ void Boids::stepSimulationCoherentGrid(float dt) {
         dev_gridCellEndIndices,
         dev_reshuffledPos, dev_reshuffledVel1, dev_reshuffledVel2);
     checkCUDAErrorWithLine("kernUpdateVelNeighborSearchScattered failed!");
+
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    printf("kernUpdateVelNeighborSearchCoherent = %f ms\n", milliseconds);
 
     kernUpdatePos << <fullBlocksPerGrid, blockSize >> > (numObjects, dt, dev_reshuffledPos, dev_reshuffledVel2);
     checkCUDAErrorWithLine("kernUpdatePos failed!");
@@ -830,6 +918,16 @@ void Boids::stepSimulationCoherentGrid(float dt) {
     glm::vec3* temp = dev_vel1;
     dev_vel1 = dev_vel2;
     dev_vel2 = temp;
+
+    // Stop timing.
+    CUDA_CHECK(cudaEventRecord(stop));
+    CUDA_CHECK(cudaEventSynchronize(stop));
+    CUDA_CHECK(cudaEventElapsedTime(&milliseconds, start, stop));
+
+    printf("[Coherent] stepSimulation time = %f ms\n", milliseconds);
+
+    CUDA_CHECK(cudaEventDestroy(start));
+    CUDA_CHECK(cudaEventDestroy(stop));
 }
 
 void Boids::endSimulation() {

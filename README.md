@@ -142,3 +142,30 @@ Additional strength over Scattered: for boids in same cell, memory is consequent
 
 ## Runtime Analysis
 
+For the first set of tests, I timed the neighbour search functions for each of the three methods, and compared it against number of boids in simulation.
+
+### Number of Boids v. Time for Neighbour Search (ms)
+
+**blockSize = 128, no visualization, dt = 0.2**
+
+| # of Boids     | Naive | Scattered Uniform Grid | Coherent Uniform Grid0.33 |
+|----------------|-------|------------------------|-----------------------|
+| 2000           | ~0.33 | ~0.05                  | ~0.04                 |
+| 5000 (default) | ~0.77 | ~0.08                  | ~0.07                 |
+| 10000          | ~1.57 | ~0.13                  | ~0.10                 |
+| 50000          | ~22.7 | ~0.46                  | ~0.37                 |
+
+| ![](images/no_vis_neighbourSearch_graph.png) |
+|:--:|
+
+**blockSize = 128, visualization, dt = 0.2**
+
+| # of Boids     | Naive | Scattered Uniform Grid | Coherent Uniform Grid |
+|----------------|-------|------------------------|-----------------------|
+| 2000           | ~0.34 | ~0.05                  | ~0.03                 |
+| 5000 (default) | ~0.77 | ~0.07                  | ~0.06                 |
+| 10000          | ~1.59 | ~0.13                  | ~0.09                 |
+| 50000          | ~21.5 | ~0.49                  | ~0.38                 |
+
+| ![](images/vis_neighbourSearch_graph.png) |
+|:--:|
