@@ -2,7 +2,7 @@
 Project 1 - Flocking**
 
 * Lewis Ghrist  
-* [LinkedIn](https://www.linkedin.com/in/lewis-ghrist-4b1b3728b/), [personal website](https://siwel-cg.github.io/siwel.cg_websiteV1/index.html#home)  
+* [LinkedIn](https://www.linkedin.com/in/lewis-ghrist-4b1b3728b/), [Personal Website](https://siwel-cg.github.io/siwel.cg_websiteV1/index.html#home)  
 * Tested on: Windows 11, AMD Ryzen 9 5950X 16-Core Processor, 64GB, NVIDIA GeForce RTX 3080 10GB (Personal PC)
 
 ---
@@ -12,7 +12,10 @@ A somewhat realistic and nice looking flocking simulation can be achieved using 
 - Move towards the centroid of your neighbors
 - Don't get to close to your neighbors
 - Move at a similar speed to your neighbors
+
 By adjusting the radius for which other agents are consider neighbors and the strength of the influence neighbors have your a boid's velocity, some varied and jcomplex behaviors can emmerge. The main place for optimization is when determining which other agenst should effect the current agent. The naive approach is to simply check every single agent to see if they are within a certain distance. This ofcourse is alot of checks, and doesn't scale well as the number of boids increases (see graphs below). For better results, we implemented a spacial grid so that rather than checking every single other agent, we just need to check the one in our current agent's cell and the 26 neighboring cells. Additionally we can even further optimize this by structuring our data in a way which allows for easy and quicker memory acessing on the GPU. Further analysis on the optimizations below:
+
+---
 
 ### Example Simulation Runs 
 These were all run with the coherent grid implementation. 
@@ -56,16 +59,17 @@ Rule 3 distance: 10.0 | Rule 3 strength: 0.1
 
 ## Performance Results
 The average fps was calculated over a 10 second window for each simulation method with varying numbers of boids.
-### FPS Line Graph
+### FPS Comparisons
 ![FPS Line Graph](images/FPS_LineGraph_V1.png)
 
-### FPS Breakdown by Block Size
 ![Block Size Graph](images/FPS_BlockGraph_V1.png)
 
 ### FPS Table
 ![FPS Table](images/FPS_Table_V1.png)
 
 At **1M+ boids**, only the coherent grid remains practical.
+
+--- 
 
 ## Performance Analysis
 For each implementation, how does changing the number of boids affect performance? Why do you think this is?
