@@ -104,6 +104,16 @@ float gridCellWidth;
 float gridInverseCellWidth;
 glm::vec3 gridMinimum;
 
+// Performance Profiling variables 
+cudaEvent_t updateVelocityStart; 
+cudaEvent_t updateVelocityEnd;
+cudaEvent_t updatePosStart;
+cudaEvent_t updatePosEnd;
+cudaEvent_t sortByKeyStart;
+cudaEvent_t sortByKeyEnd;
+cudaEvent_t identifyCellStart;
+cudaEvent_t identifyCellEnd;
+
 /******************
 * initSimulation *
 ******************/
@@ -191,8 +201,19 @@ void Boids::initSimulation(int N) {
   cudaMalloc((void**)&dev_gridCellEndIndices, gridCellCount * sizeof(int));
   checkCUDAErrorWithLine("cudaMalloc dev_gridCellEndIndices failed!");
 
+  // Initialize thrust pointers
   dev_thrust_particleArrayIndices = thrust::device_ptr<int>(dev_particleArrayIndices);
   dev_thrust_particleGridIndices = thrust::device_ptr<int>(dev_particleGridIndices);
+
+  // Initialize performance profiling events
+  cudaEventCreate(&updateVelocityStart);
+  cudaEventCreate(&updateVelocityEnd);
+  cudaEventCreate(&updatePosStart);
+  cudaEventCreate(&updatePosEnd);
+  cudaEventCreate(&sortByKeyStart);
+  cudaEventCreate(&sortByKeyEnd);
+  cudaEventCreate(&identifyCellStart);
+  cudaEventCreate(&identifyCellEnd);
 
   cudaDeviceSynchronize();
 }
@@ -716,6 +737,13 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
 }
 
 /**
+* Print some performance debug messages
+*/
+void printPerformanceDebug() {
+
+}
+
+/**
 * Step the entire N-body simulation by `dt` seconds.
 */
 void Boids::stepSimulationNaive(float dt) {
@@ -821,6 +849,16 @@ void Boids::endSimulation() {
   cudaFree(dev_particleGridIndices);
   cudaFree(dev_gridCellStartIndices);
   cudaFree(dev_gridCellEndIndices);
+
+  // Initialize performance profiling events
+  cudaEventDestroy(updateVelocityStart);
+  cudaEventDestroy(updateVelocityEnd);
+  cudaEventDestroy(updatePosStart);
+  cudaEventDestroy(updatePosEnd);
+  cudaEventDestroy(sortByKeyStart);
+  cudaEventDestroy(sortByKeyEnd);
+  cudaEventDestroy(identifyCellStart);
+  cudaEventDestroy(identifyCellEnd);
 }
 
 void Boids::unitTest() {
