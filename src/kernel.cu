@@ -509,6 +509,7 @@ __global__ void kernUpdateVelNeighborSearchScattered(
                 // - For each cell, read the start/end indices in the boid pointer array.
                 int cellIndx = gridIndex3Dto1D(x, y, z, gridResolution);
 
+                // skipping invalid indicies
                 if (gridCellStartIndices[cellIndx] == -1 || gridCellEndIndices[cellIndx] == -1)
                 {
                     continue;
@@ -583,6 +584,7 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
                 // - For each cell, read the start/end indices in the boid pointer array.
                 int cellIndx = gridIndex3Dto1D(x, y, z, gridResolution);
 
+                // skipping invalid indicies
                 if (gridCellStartIndices[cellIndx] == -1 || gridCellEndIndices[cellIndx] == -1)
                 {
                     continue;
@@ -714,15 +716,6 @@ void Boids::stepSimulationCoherentGrid(float dt) {
   // - BIG DIFFERENCE: use the rearranged array index buffer to reshuffle all
   //   the particle data in the simulation array.
   //   CONSIDER WHAT ADDITIONAL BUFFERS YOU NEED
-  
-    //cudaMemcpy(dev_pos_coherent, dev_pos, numObjects - 1, cudaMemcpyDeviceToDevice);
-    //cudaMemcpy(dev_vel1_coherent, dev_vel1, numObjects - 1, cudaMemcpyDeviceToDevice);
-
-    //thrust::device_ptr<glm::vec3> dev_thrust_pos(dev_pos_coherent);
-    //thrust::device_ptr<glm::vec3> dev_thrust_vel(dev_vel1_coherent);
-
-    //thrust::sort_by_key(dev_thrust_particleGridIndices, dev_thrust_particleGridIndices + numObjects, dev_thrust_pos);
-    //thrust::sort_by_key(dev_thrust_particleGridIndices, dev_thrust_particleGridIndices + numObjects, dev_thrust_vel);
 
     sortArray <<<boidsBlocks, threadsPerBlock >>> (numObjects, dev_pos, dev_pos_coherent, dev_vel1, dev_vel1_coherent, dev_particleArrayIndices);
 
@@ -733,10 +726,10 @@ void Boids::stepSimulationCoherentGrid(float dt) {
   // - Update positions
   // - Ping-pong buffers as needed. THIS MAY BE DIFFERENT FROM BEFORE.
     glm::vec3* ptr = dev_vel2;
-    dev_vel2 = dev_vel1;
-    dev_vel1 = ptr;
+    dev_vel2 = dev_vel1_coherent;
+    dev_vel1_coherent = ptr;
 
-    kernUpdatePos << <boidsBlocks, threadsPerBlock >> > (numObjects, dt, dev_pos, dev_vel1);
+    kernUpdatePos << <boidsBlocks, threadsPerBlock >> > (numObjects, dt, dev_pos_coherent, dev_vel1_coherent);
 }
 
 void Boids::endSimulation() {
