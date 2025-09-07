@@ -271,12 +271,12 @@ void initShaders(GLuint * program) {
       #endif
 
       // CALCULATE AVERAGE FPS OVER DURATION
-      if (time - startTime >= duration) {
-          double avgFPS = totalFrames / (time - startTime);
-          std::cout << "Average FPS over " << duration << " seconds: "
-              << avgFPS << std::endl;
-          break;
-      }
+      //if (time - startTime >= duration) {
+      //    double avgFPS = totalFrames / (time - startTime);
+      //    std::cout << "Average FPS over " << duration << " seconds: "
+      //        << avgFPS << std::endl;
+      //    break;
+      //}
     }
     glfwDestroyWindow(window);
     glfwTerminate();
