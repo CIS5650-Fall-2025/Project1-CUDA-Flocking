@@ -6,13 +6,13 @@ Project 1 - Flocking**
 * Tested on: Windows 11, Intel(R) CORE(TM) Ultra 9 275HX @ 2.70GHz 32.0GB, NVIDIA GeFORCE RTX 5080 Laptop GPU 16384MB
 
 # CIS 5650 Project 1 - Boids
-![](images/20000.gif)
+![](images/gif1.gif)
 ![](images/boids.png)
 ![](images/boids2.png)
 ![](images/boids3.png)
 These are some gifs and screenshots of my boids implementation.
 
-![](images/100000.gif)
+![](images/gif2.gif)
 We can also increase the boids count, this one representing 100000 boids!
 
 ## Analysis
