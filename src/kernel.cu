@@ -47,7 +47,7 @@ void checkCUDAError(const char *msg, int line = -1) {
 *****************/
 
 /*! Block size used for CUDA kernel launch. */
-#define blockSize 128
+#define blockSize 1024
 
 // LOOK-1.2 Parameters for the boids algorithm.
 // These worked well in our reference implementation.
@@ -109,6 +109,8 @@ cudaEvent_t updateVelocityStart;
 cudaEvent_t updateVelocityEnd;
 cudaEvent_t updatePosStart;
 cudaEvent_t updatePosEnd;
+cudaEvent_t computeIndicesStart; 
+cudaEvent_t computeIndicesEnd;
 cudaEvent_t sortByKeyStart;
 cudaEvent_t sortByKeyEnd;
 cudaEvent_t identifyCellStart;
@@ -177,7 +179,7 @@ void Boids::initSimulation(int N) {
   checkCUDAErrorWithLine("kernGenerateRandomPosArray failed!");
 
   // LOOK-2.1 computing grid params
-  gridCellWidth = 1.0f * std::max(std::max(rule1Distance, rule2Distance), rule3Distance);
+  gridCellWidth = 2.0f * std::max(std::max(rule1Distance, rule2Distance), rule3Distance);
   int halfSideCount = (int)(scene_scale / gridCellWidth) + 1;
   gridSideCount = 2 * halfSideCount;
 
@@ -214,6 +216,8 @@ void Boids::initSimulation(int N) {
   cudaEventCreate(&sortByKeyEnd);
   cudaEventCreate(&identifyCellStart);
   cudaEventCreate(&identifyCellEnd);
+  cudaEventCreate(&computeIndicesStart); 
+  cudaEventCreate(&computeIndicesEnd);
 
   cudaDeviceSynchronize();
 }
@@ -736,11 +740,99 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
     vel2[index] = newVel; 
 }
 
-/**
-* Print some performance debug messages
-*/
-void printPerformanceDebug() {
+static int   g_reportEveryN = 500;
+static int   g_framesInWin = 0;
+static float g_accVelMs = 0.f;
+static float g_accPosMs = 0.f;
+static float g_accSortMs = 0.f;
+static float g_accIdentifyMs = 0.f;
+static float g_accComputeIdxMs = 0.f;
+static uint32_t g_cntVel = 0;
+static uint32_t g_cntPos = 0;
+static uint32_t g_cntSort = 0;
+static uint32_t g_cntIdentify = 0;
+static uint32_t g_cntComputeIdx = 0;
 
+inline void setPerfReportInterval(int frames) {
+    if (frames > 0) g_reportEveryN = frames;
+}
+
+static inline bool accumulateStage(const cudaEvent_t* startEvt,
+    const cudaEvent_t* endEvt,
+    float& accMs,
+    uint32_t& cnt)
+{
+    if (!startEvt || !endEvt) return false;
+    if (cudaEventSynchronize(*endEvt) != cudaSuccess) return false;
+    float ms = 0.f;
+    if (cudaEventElapsedTime(&ms, *startEvt, *endEvt) != cudaSuccess) return false;
+    accMs += ms;
+    ++cnt;
+    return true;
+}
+
+void printPerformanceDebug(
+    int numObjects,
+    const cudaEvent_t* computeIndicesStart, const cudaEvent_t* computeIndicesEnd,
+    const cudaEvent_t* identifyCellStart, const cudaEvent_t* identifyCellEnd,
+    const cudaEvent_t* sortByKeyStart, const cudaEvent_t* sortByKeyEnd,
+    const cudaEvent_t* updateVelocityStart, const cudaEvent_t* updateVelocityEnd,
+    const cudaEvent_t* updatePosStart, const cudaEvent_t* updatePosEnd)
+{
+    (void)accumulateStage(computeIndicesStart, computeIndicesEnd, g_accComputeIdxMs, g_cntComputeIdx);
+    (void)accumulateStage(updateVelocityStart, updateVelocityEnd, g_accVelMs, g_cntVel);
+    (void)accumulateStage(updatePosStart, updatePosEnd, g_accPosMs, g_cntPos);
+    (void)accumulateStage(sortByKeyStart, sortByKeyEnd, g_accSortMs, g_cntSort);
+    (void)accumulateStage(identifyCellStart, identifyCellEnd, g_accIdentifyMs, g_cntIdentify);
+
+    ++g_framesInWin;
+
+    if (g_framesInWin >= g_reportEveryN) {
+        const bool hasComputeIdx = (g_cntComputeIdx > 0);
+        const bool hasVel = (g_cntVel > 0);
+        const bool hasPos = (g_cntPos > 0);
+        const bool hasSort = (g_cntSort > 0);
+        const bool hasId = (g_cntIdentify > 0);
+
+        const float avgComputeIdxMs = hasComputeIdx ? (g_accComputeIdxMs / g_cntComputeIdx) : 0.f;
+        const float avgVelMs = hasVel ? (g_accVelMs / g_cntVel) : 0.f;
+        const float avgPosMs = hasPos ? (g_accPosMs / g_cntPos) : 0.f;
+        const float avgSortMs = hasSort ? (g_accSortMs / g_cntSort) : 0.f;
+        const float avgIdMs = hasId ? (g_accIdentifyMs / g_cntIdentify) : 0.f;
+
+        float avgTotal = 0.f;
+        if (hasComputeIdx) avgTotal += avgComputeIdxMs;
+        if (hasVel)        avgTotal += avgVelMs;
+        if (hasPos)        avgTotal += avgPosMs;
+        if (hasSort)       avgTotal += avgSortMs;
+        if (hasId)         avgTotal += avgIdMs;
+
+        dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
+
+        auto printOrNA = [](bool has, float v) {
+            if (has) std::printf("%7.3f ms", v);
+            else     std::printf("    n/a  ");
+        };
+
+        std::printf("[Perf Avg over %d frames]\n", g_framesInWin);
+        std::printf("  computeIndices: "); printOrNA(hasComputeIdx, avgComputeIdxMs); std::printf("\n");
+        std::printf("  updateVelocity: "); printOrNA(hasVel, avgVelMs);        std::printf("\n");
+        std::printf("  updatePos     : "); printOrNA(hasPos, avgPosMs);        std::printf("\n");
+        std::printf("  sortByKey     : "); printOrNA(hasSort, avgSortMs);       std::printf("\n");
+        std::printf("  identifyCell  : "); printOrNA(hasId, avgIdMs);         std::printf("\n");
+        std::printf("  TOTAL (GPU)   : %7.3f ms\n", avgTotal);
+        std::printf("Launch config:\n");
+        std::printf("  gridSize.x    : %d\n", fullBlocksPerGrid.x);
+        std::printf("  blockSize     : %d\n", blockSize);
+        std::printf("  numObjects    : %d\n\n", numObjects);
+
+        g_framesInWin = 0;
+        g_accComputeIdxMs = 0.f; g_cntComputeIdx = 0;
+        g_accVelMs = 0.f; g_cntVel = 0;
+        g_accPosMs = 0.f; g_cntPos = 0;
+        g_accSortMs = 0.f; g_cntSort = 0;
+        g_accIdentifyMs = 0.f; g_cntIdentify = 0;
+    }
 }
 
 /**
@@ -750,11 +842,27 @@ void Boids::stepSimulationNaive(float dt) {
 
   // TODO-1.2 - use the kernels you wrote to step the simulation forward in time.
     dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
+
+    cudaEventRecord(updateVelocityStart);
     kernUpdateVelocityBruteForce << <fullBlocksPerGrid, blockSize >> > (numObjects, dev_pos, dev_vel1, dev_vel2); 
+    cudaEventRecord(updateVelocityEnd);
+
+    cudaEventRecord(updatePosStart);
     kernUpdatePos << < fullBlocksPerGrid, blockSize >> > (numObjects, dt, dev_pos, dev_vel2);
+    cudaEventRecord(updatePosEnd);
 
   // TODO-1.2 ping-pong the velocity buffers
     std::swap(dev_vel1, dev_vel2); 
+
+    printPerformanceDebug(
+        numObjects,
+        nullptr, nullptr,
+        nullptr, nullptr,
+        nullptr, nullptr,
+        &updateVelocityStart, &updateVelocityEnd,
+        &updatePosStart, &updatePosEnd
+    );
+
 }
 
 void Boids::stepSimulationScatteredGrid(float dt) {
@@ -764,13 +872,18 @@ void Boids::stepSimulationScatteredGrid(float dt) {
     // - label each particle with its array index as well as its grid index.
     //   Use 2x width grids.
     dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
+
+    cudaEventRecord(computeIndicesStart);
     kernComputeIndices << <fullBlocksPerGrid, blockSize >> > (numObjects, gridSideCount, gridMinimum, 1.0f / gridCellWidth,
         dev_pos, dev_particleArrayIndices, dev_particleGridIndices);
     checkCUDAErrorWithLine("Failed to compute indices"); 
-
+    cudaEventRecord(computeIndicesEnd);
+    checkCUDAErrorWithLine("Failed to record compute end");
     // - Unstable key sort using Thrust. A stable sort isn't necessary, but you
     //   are welcome to do a performance comparison.
+    cudaEventRecord(sortByKeyStart);
     thrust::sort_by_key(dev_thrust_particleGridIndices, dev_thrust_particleGridIndices + numObjects, dev_thrust_particleArrayIndices); 
+    cudaEventRecord(sortByKeyEnd);
   
     // - Naively unroll the loop for finding the start and end indices of each
     //   cell's data pointers in the array of boid indices
@@ -779,17 +892,32 @@ void Boids::stepSimulationScatteredGrid(float dt) {
     kernResetIntBuffer << <fullBlocksPerGrid, blockSize >> > (gridCellCount, dev_gridCellEndIndices, -1);
 
     fullBlocksPerGrid = dim3((numObjects + blockSize - 1) / blockSize);
+    cudaEventRecord(identifyCellStart);
     kernIdentifyCellStartEnd << <fullBlocksPerGrid, blockSize >> > (numObjects, dev_particleGridIndices, dev_gridCellStartIndices, dev_gridCellEndIndices); 
+    cudaEventRecord(identifyCellEnd);
 
     // - Perform velocity updates using neighbor search
+    cudaEventRecord(updateVelocityStart);
     kernUpdateVelNeighborSearchScattered << <fullBlocksPerGrid, blockSize >> > (numObjects, gridSideCount, gridMinimum, gridInverseCellWidth,
         gridCellWidth, dev_gridCellStartIndices, dev_gridCellEndIndices, dev_particleArrayIndices, dev_pos, dev_vel1, dev_vel2); 
+    cudaEventRecord(updateVelocityEnd);
     
     // - Update positions
+    cudaEventRecord(updatePosStart); 
     kernUpdatePos << < fullBlocksPerGrid, blockSize >> > (numObjects, dt, dev_pos, dev_vel2);
+    cudaEventRecord(updatePosEnd);
 
     // - Ping-pong buffers as needed
     std::swap(dev_vel1, dev_vel2);
+
+    printPerformanceDebug(
+        numObjects,
+        &computeIndicesStart, &computeIndicesEnd,
+        &identifyCellStart, &identifyCellEnd,
+        &sortByKeyStart, &sortByKeyEnd,
+        &updateVelocityStart, &updateVelocityEnd,
+        &updatePosStart, &updatePosEnd
+    );
 }
 
 void Boids::stepSimulationCoherentGrid(float dt) {
@@ -799,9 +927,11 @@ void Boids::stepSimulationCoherentGrid(float dt) {
     // - Label each particle with its array index as well as its grid index.
     //   Use 2x width grids
     dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
+    cudaEventRecord(computeIndicesStart);
     kernComputeIndices << <fullBlocksPerGrid, blockSize >> > (numObjects, gridSideCount, gridMinimum, 1.0f / gridCellWidth,
         dev_pos, dev_particleArrayIndices, dev_particleGridIndices);
     checkCUDAErrorWithLine("Failed to compute indices");
+    cudaEventRecord(computeIndicesEnd);
 
     // - Unstable key sort using Thrust. A stable sort isn't necessary, but you
     //   are welcome to do a performance comparison.
@@ -811,10 +941,12 @@ void Boids::stepSimulationCoherentGrid(float dt) {
             thrust::device_pointer_cast(dev_vel1)
         )
     );
-
+    
+    cudaEventRecord(sortByKeyStart);
     thrust::sort_by_key(dev_thrust_particleGridIndices,
         dev_thrust_particleGridIndices + numObjects,
         zippedIter);
+    cudaEventRecord(sortByKeyEnd);
 
     // - Naively unroll the loop for finding the start and end indices of each
     //   cell's data pointers in the array of boid indices
@@ -823,20 +955,35 @@ void Boids::stepSimulationCoherentGrid(float dt) {
     kernResetIntBuffer << <fullBlocksPerGrid, blockSize >> > (gridCellCount, dev_gridCellEndIndices, -1);
 
     fullBlocksPerGrid = dim3((numObjects + blockSize - 1) / blockSize);
+    cudaEventRecord(identifyCellStart);
     kernIdentifyCellStartEnd << <fullBlocksPerGrid, blockSize >> > (numObjects, dev_particleGridIndices, dev_gridCellStartIndices, dev_gridCellEndIndices);
+    cudaEventRecord(identifyCellEnd);
 
     // - BIG DIFFERENCE: use the rearranged array index buffer to reshuffle all
     //   the particle data in the simulation array.
     //   CONSIDER WHAT ADDITIONAL BUFFERS YOU NEED
     // - Perform velocity updates using neighbor search
+    cudaEventRecord(updateVelocityStart);
     kernUpdateVelNeighborSearchCoherent << <fullBlocksPerGrid, blockSize >> > (numObjects, gridSideCount, gridMinimum, gridInverseCellWidth,
         gridCellWidth, dev_gridCellStartIndices, dev_gridCellEndIndices, dev_pos, dev_vel1, dev_vel2); 
+    cudaEventRecord(updateVelocityEnd);
 
     // - Update positions
+    cudaEventRecord(updatePosStart);
     kernUpdatePos << < fullBlocksPerGrid, blockSize >> > (numObjects, dt, dev_pos, dev_vel2);
+    cudaEventRecord(updatePosEnd);
 
     // - Ping-pong buffers as needed. THIS MAY BE DIFFERENT FROM BEFORE.
     std::swap(dev_vel1, dev_vel2);
+
+    printPerformanceDebug(
+        numObjects,
+        &computeIndicesStart, &computeIndicesEnd,
+        &identifyCellStart, &identifyCellEnd,
+        &sortByKeyStart, &sortByKeyEnd,
+        &updateVelocityStart, &updateVelocityEnd,
+        &updatePosStart, &updatePosEnd
+    );
 }
 
 void Boids::endSimulation() {
@@ -855,6 +1002,8 @@ void Boids::endSimulation() {
   cudaEventDestroy(updateVelocityEnd);
   cudaEventDestroy(updatePosStart);
   cudaEventDestroy(updatePosEnd);
+  cudaEventDestroy(computeIndicesStart);
+  cudaEventDestroy(computeIndicesEnd);
   cudaEventDestroy(sortByKeyStart);
   cudaEventDestroy(sortByKeyEnd);
   cudaEventDestroy(identifyCellStart);
