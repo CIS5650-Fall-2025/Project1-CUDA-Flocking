@@ -18,25 +18,25 @@ We can also increase the boids count, this one representing 100000 boids!
 ## Analysis
 This boids implementation was tested on the machine specifications listed above with several configurations.
 
-1. Number of Boids
+1. Number of Boids  
 ![](images/chart1.png)
 ![](images/chart2.png)
 As seen above the performance decreases with the number of boids being simulated. It increases most sharply for the naive implementation, likely due to the fact that checking every boid against one another becomes an exponential problem, 
 one that the uniform and coherent grid implementations attempted to remedy, and as seen the dropoff in performance for these two becomes linear rather than logarithmic. Still as the number of boids increases the number of potential boids in 
 each cell also increases, which causes performance issues for these implementations later on as well.
 
-2. Block Size
+2. Block Size  
 ![](images/chart3.png)
 As seen above the performance of the naive implementation was affected by block size, both too small a block size and too large a block size caused performance decrease, while block size did not seem to affect the performance of the uniform grid 
 or coherent grid implementations. It is possible that with few too blocks, an SMs resources are not being fully utilized as we have partial warps being housed on the SMs. This can likely cause thread idling. On the other hand, too large a block size 
 can likely cause resources to clog, hogging registers/shared memory. The uniform and coherent aren't as affected likely because these implementations only check local neighbors.
 
-3. Coherent Grid Performance Gain
+3. Coherent Grid Performance Gain  
 The coherent grid did not lead to any performance gain, but rather in its worst cases lead to performance decrease as compared to the uniform grid. This can be seen in the various charts above, the coherent grid performing worse at first, 
 then following the performance dropoff of the uniform grid as the boid count increases. This was unexpected, as it would seem that more coherent memory access would lead to better performance, however, it seems that the overhead involved with 
 the implementation offsets any potential benefits until the boid count increases, at which point the implementation seemingly performs just as well as the uniform grid.
 
-4. 27 vs 8 Neighboring Cell Check
+4. 27 vs 8 Neighboring Cell Check  
 
 | Cell Counts | Uniform FPS | Coherent FPS |
 |-------------|-------------|--------------|
