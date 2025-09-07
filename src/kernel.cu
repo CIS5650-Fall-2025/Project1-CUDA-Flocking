@@ -56,8 +56,8 @@ void checkCUDAError(const char *msg, int line = -1) {
 // These worked well in our reference implementation.
 // ORIGINALLY 5, 3, 5
 #define rule1Distance 5.0f
-#define rule2Distance 3.0f
-#define rule3Distance 5.0f
+#define rule2Distance 2.0f
+#define rule3Distance 10.0f
 
 // ORIGINALLY 0.01, 0.1, 0.1
 #define rule1Scale 0.01f
