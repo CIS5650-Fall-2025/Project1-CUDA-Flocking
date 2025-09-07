@@ -702,7 +702,31 @@ void Boids::stepSimulationNaive(float dt) {
     const int blocks = (numObjects + blockSize - 1) / blockSize;
 	const int threadsPerBlock = blockSize;
 
+    
+    // Prepare
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    // Start record
+    cudaEventRecord(start, 0);
+    
+
     kernUpdateVelocityBruteForce << <blocks, threadsPerBlock >> > (numObjects, dev_pos, dev_vel1, dev_vel2);
+
+    
+    // Stop event
+    cudaEventRecord(stop, 0);
+    cudaEventSynchronize(stop);
+    float elapsedTime;
+    cudaEventElapsedTime(&elapsedTime, start, stop); // that's our time!
+
+	//std::cout << "Time to calculate naive vel: " << elapsedTime << " ms" << std::endl;
+    
+    // Clean up:
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
+    
+
 	kernUpdatePos << <blocks, threadsPerBlock >> > (numObjects, dt, dev_pos, dev_vel2);
 
   // TODO-1.2 ping-pong the velocity buffers
@@ -739,8 +763,31 @@ void Boids::stepSimulationScatteredGrid(float dt) {
   //   cell's data pointers in the array of boid indices
   // - Perform velocity updates using neighbor search
 
+    /*
+    // Prepare
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    // Start record
+    cudaEventRecord(start, 0);
+    */
+
     kernUpdateVelNeighborSearchScattered << <fullBlocksPerGrid, threadsPerBlock >> > (numObjects, gridSideCount, gridMinimum, gridInverseCellWidth, gridCellWidth, dev_gridCellStartIndices, dev_gridCellEndIndices, dev_particleArrayIndices, dev_pos, dev_vel1, dev_vel2);
- 
+
+    /*
+    // Stop event
+    cudaEventRecord(stop, 0);
+    cudaEventSynchronize(stop);
+    float elapsedTime;
+    cudaEventElapsedTime(&elapsedTime, start, stop); // that's our time!
+
+    std::cout << "Time to calculate uniform grid vel: " << elapsedTime << " ms" << std::endl;
+
+    // Clean up:
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
+    */
+
     // - Update positions
     kernUpdatePos << <fullBlocksPerGrid, threadsPerBlock >> > (numObjects, dt, dev_pos, dev_vel2);
 
@@ -767,7 +814,7 @@ void Boids::stepSimulationCoherentGrid(float dt) {
   //   the particle data in the simulation array.
   //   CONSIDER WHAT ADDITIONAL BUFFERS YOU NEED
 
-    dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
+    dim3 fullBlocksPerGrid(((numObjects + blockSize - 1) / blockSize));
     const int threadsPerBlock = blockSize;
     
     kernComputeIndices << <fullBlocksPerGrid, threadsPerBlock >> > (numObjects, gridSideCount, gridMinimum, gridInverseCellWidth, dev_pos, dev_particleArrayIndices, dev_particleGridIndices);
@@ -797,7 +844,30 @@ void Boids::stepSimulationCoherentGrid(float dt) {
     // - Perform velocity updates using neighbor search
     // - Update positions
 
+    /*
+    // Prepare
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    // Start record
+    cudaEventRecord(start, 0);
+    */
+
 	kernUpdateVelNeighborSearchCoherent << <fullBlocksPerGrid, threadsPerBlock >> > (numObjects, gridSideCount, gridMinimum, gridInverseCellWidth, gridCellWidth, dev_gridCellStartIndices, dev_gridCellEndIndices, dev_pos, dev_vel1, dev_vel2);
+
+    /*
+    // Stop event
+    cudaEventRecord(stop, 0);
+    cudaEventSynchronize(stop);
+    float elapsedTime;
+    cudaEventElapsedTime(&elapsedTime, start, stop); // that's our time!
+
+    std::cout << "Time to calculate coherent grid vel: " << elapsedTime << " ms" << std::endl;
+
+    // Clean up:
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
+    */
 
 	kernUpdatePos << <fullBlocksPerGrid, threadsPerBlock >> > (numObjects, dt, dev_pos, dev_vel2);
 
