@@ -535,7 +535,7 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
   int N, int gridResolution, glm::vec3 gridMin,
   float inverseCellWidth,
   int *gridCellStartIndices, int *gridCellEndIndices,
-  int* particleArrayIndices,
+  //int* particleArrayIndices,
   glm::vec3 *pos, glm::vec3 *vel1, glm::vec3 *vel2) {
   // TODO-2.3 - This should be very similar to kernUpdateVelNeighborSearchScattered,
   // except with one less level of indirection.
@@ -712,8 +712,7 @@ __global__ void kernReorderDataAndIndices(
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     if (index >= N) return;
 
-    int boidIndex = particleArrayIndices[index];  // original index of this boid
-
+    int boidIndex = particleArrayIndices[index];
     // Copy data into coherent arrays
     posCoherent[index] = pos[boidIndex];
     velCoherent[index] = vel[boidIndex];
@@ -764,8 +763,8 @@ void Boids::stepSimulationCoherentGrid(float dt) {
     checkCUDAErrorWithLine("kernIdentifyCellStartEnd failed!");
     cudaDeviceSynchronize();
 
-    kernUpdateVelNeighborSearchScattered << <fullBlocksPerGrid, blockSize >> > (N, gridSideCount, gridMinimum, gridInverseCellWidth,
-        dev_gridCellStartIndices, dev_gridCellEndIndices, dev_particleArrayIndices, dev_posCoherent, dev_velCoherent, dev_vel2);
+    kernUpdateVelNeighborSearchCoherent << <fullBlocksPerGrid, blockSize >> > (N, gridSideCount, gridMinimum, gridInverseCellWidth,
+        dev_gridCellStartIndices, dev_gridCellEndIndices, dev_posCoherent, dev_velCoherent, dev_vel2);
     checkCUDAErrorWithLine("kernUpdateVelNeighborSearchCoherent failed!");
     cudaDeviceSynchronize();
 
