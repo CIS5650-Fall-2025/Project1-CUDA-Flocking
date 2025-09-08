@@ -40,10 +40,10 @@ The above shows the full simulation process with 100,000 boids.
   Performance decreases extremely rapidly as the number of boids grows (e.g., ~4400 fps at 100 boids → ~3.5 fps at 100,000 boids without visualization). This is because the algorithm is O(N²): every boid checks all others, so computation explodes as population increases.
 
 - **Uniform grid:**  
-  Performance decreases much more gradually. The grid restricts neighbor checks to nearby cells, so the complexity is closer to O(N) in practice. This allows it to scale far better than the naive method. Using 8 cells in the coherent path reduces a small constant cost as well.
+  Performance decreases much more gradually. The grid restricts neighbor checks to nearby cells, so the complexity is closer to O(N) in practice. This allows it to scale far better than the naive method. 
 
 - **Coherent grid:**  
-  Similar to the uniform grid at small scales, but consistently faster at larger scales. The improvement comes from reordering boids in memory so neighbors are contiguous, which enables coalesced global memory access and reduces latency.
+  Similar to the uniform grid at small scales, but consistently faster at larger scales. The improvement comes from reordering boids in memory so neighbors are contiguous, which enables coalesced global memory access and reduces latency. Using 8 cells in the coherent path reduces a small constant cost as well.
 
 - **With visualization:**  
   All values are lower due to rendering overhead, but the same trends hold: naive collapses at scale, while uniform and coherent grids degrade more gracefully.
