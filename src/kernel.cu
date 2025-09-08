@@ -59,6 +59,8 @@ void checkCUDAError(const char *msg, int line = -1) {
 #define rule2Scale 0.1f
 #define rule3Scale 0.1f
 
+#define ed 1.0f
+
 #define maxSpeed 1.0f
 
 /*! Size of the starting area in simulation space. */
@@ -252,9 +254,27 @@ __device__ glm::vec3 computeVelocityChange(int N, int iSelf, const glm::vec3 *po
 */
 __global__ void kernUpdateVelocityBruteForce(int N, glm::vec3 *pos,
   glm::vec3 *vel1, glm::vec3 *vel2) {
-  // Compute a new velocity based on pos and vel1
-  // Clamp the speed
-  // Record the new velocity into vel2. Question: why NOT vel1?
+    // compute thread
+    int index = threadIdx.x + (blockIdx.x * blockDim.x);
+    if (index >= N) {
+        return;
+    }
+
+    // Compute a new velocity based on pos and vel1
+    glm::vec3 velChange = computeVelocityChange(N, index, pos, vel1);
+    glm::vec3 thisVel = vel1[index] * velChange;
+  
+    // Clamp the speed
+    float thisSpeed = glm::length(thisVel);
+    if (thisSpeed > maxSpeed) {
+        thisVel = glm::normalize(thisVel) * maxSpeed;
+    }
+
+    // Record the new velocity into vel2. Question: why NOT vel1? 
+    // Answer: calculations for one boid depend on calculations for
+    // surrounding boids. If you change their state values before all 
+    // other boids have finished computations, the result will be incorrect.
+    vel2[index] = thisVel;
 }
 
 /**
@@ -357,8 +377,13 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
 * Step the entire N-body simulation by `dt` seconds.
 */
 void Boids::stepSimulationNaive(float dt) {
-  // TODO-1.2 - use the kernels you wrote to step the simulation forward in time.
-  // TODO-1.2 ping-pong the velocity buffers
+    // TODO-1.2 - use the kernels you wrote to step the simulation forward in time.
+    dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
+    kernUpdateVelocityBruteForce << <fullBlocksPerGrid, blockSize>> > (numObjects, dev_pos, dev_vel1, dev_vel2);
+    kernUpdatePos << <fullBlocksPerGrid, blockSize >> > (numObjects, dt, dev_pos, dev_vel2);
+    
+    // TODO-1.2 ping-pong the velocity buffers
+    std::swap(dev_vel1, dev_vel2);
 }
 
 void Boids::stepSimulationScatteredGrid(float dt) {
