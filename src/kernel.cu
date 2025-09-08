@@ -48,6 +48,7 @@ void checkCUDAError(const char *msg, int line = -1) {
 
 /*! Block size used for CUDA kernel launch. */
 #define blockSize 128
+#define gridScale 2.0f
 
 // LOOK-1.2 Parameters for the boids algorithm.
 // These worked well in our reference implementation.
@@ -169,7 +170,7 @@ void Boids::initSimulation(int N) {
   checkCUDAErrorWithLine("kernGenerateRandomPosArray failed!");
 
   // LOOK-2.1 computing grid params
-  gridCellWidth = 2.0f * std::max(std::max(rule1Distance, rule2Distance), rule3Distance);
+  gridCellWidth = gridScale * std::max(std::max(rule1Distance, rule2Distance), rule3Distance);
   int halfSideCount = (int)(scene_scale / gridCellWidth) + 1;
   gridSideCount = 2 * halfSideCount;
 
@@ -452,12 +453,26 @@ __global__ void kernUpdateVelNeighborSearchScattered(
 	glm::vec3 c(0.0f, 0.0f, 0.0f);
 	glm::vec3 perceived_velocity(0.0f, 0.0f, 0.0f);
   int neighbor_count3 = 0;
-  for (int i = -1; i <= 1; i++) {
-    for (int j = -1; j <= 1; j++) {
-      for (int k = -1; k <= 1; k++) {
-        int nx = x + i;
-        int ny = y + j;
-        int nz = z + k;
+  
+	glm::vec3 offset(-0.0001f, -0.0001f, -0.0001f);
+  offset.x = grid_pos.x - x < 0.5f ? -1 : 0;
+	offset.y = grid_pos.y - y < 0.5f ? -1 : 0;
+	offset.z = grid_pos.z - z < 0.5f ? -1 : 0;
+
+  int mini = gridScale == 2.0f ? 0 : -1;
+	int minj = gridScale == 2.0f ? 0 : -1;
+	int mink = gridScale == 2.0f ? 0 : -1;
+
+	offset.x = gridScale == 2.0f ? offset.x : 0;
+	offset.y = gridScale == 2.0f ? offset.y : 0;
+	offset.z = gridScale == 2.0f ? offset.z : 0;
+
+  for (int i = mini; i <= 1; i++) {
+    for (int j = minj; j <= 1; j++) {
+      for (int k = mink; k <= 1; k++) {
+        int nx = x + i + offset.x;
+        int ny = y + j + offset.y;
+        int nz = z + k + offset.z;
         if (nx < 0 || nx >= gridResolution ||
           ny < 0 || ny >= gridResolution ||
           nz < 0 || nz >= gridResolution) {
@@ -542,13 +557,27 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
 	glm::vec3 c(0.0f, 0.0f, 0.0f);
   glm::vec3 perceived_velocity(0.0f, 0.0f, 0.0f);
   int neighbor_count3 = 0;
-  for (int i = -1; i <= 1; i++) {
-    for (int j = -1; j <= 1; j++) {
-      for (int k = -1; k <= 1; k++) {
+
+  glm::vec3 offset(-0.0001f, -0.0001f, -0.0001f);
+  offset.x = grid_pos.x - x < 0.5f ? -1 : 0;
+  offset.y = grid_pos.y - y < 0.5f ? -1 : 0;
+  offset.z = grid_pos.z - z < 0.5f ? -1 : 0;
+
+  int mini = gridScale == 2.0f ? 0 : -1;
+  int minj = gridScale == 2.0f ? 0 : -1;
+  int mink = gridScale == 2.0f ? 0 : -1;
+
+  offset.x = gridScale == 2.0f ? offset.x : 0;
+  offset.y = gridScale == 2.0f ? offset.y : 0;
+  offset.z = gridScale == 2.0f ? offset.z : 0;
+
+  for (int i = mini; i <= 1; i++) {
+    for (int j = minj; j <= 1; j++) {
+      for (int k = mink; k <= 1; k++) {
 				// DIFFERENCE: x goes first here
-        int nx = x + k;
-        int ny = y + j;
-        int nz = z + i;
+        int nx = x + k + offset.x;
+        int ny = y + j + offset.y;
+        int nz = z + i + offset.z;
         if (nx < 0 || nx >= gridResolution ||
           ny < 0 || ny >= gridResolution ||
           nz < 0 || nz >= gridResolution) {
