@@ -1,6 +1,9 @@
 **University of Pennsylvania, CIS 5650: GPU Programming and Architecture,
 Project 1 - Flocking**
 
+
+
+
 * Daniel Chen
   * https://www.linkedin.com/in/daniel-c-a02ba2229/
 * Tested on: Windows 11, AMD Ryzen 7 8845HS w/ Radeon 780M Graphics (3.80 GHz), RTX 4070 notebook
@@ -13,7 +16,7 @@ The following answers are as requested in [INSTRUCTION.md](/INSTRUCTION.md).
 
 [recording](/images/rec.mp4)
 
-https://github.com/user-attachments/assets/901fc1e9-3a3c-4719-8fb4-4bc46a35e69f
+https://github.com/user-attachments/assets/5f65ead3-24a1-4437-a3c9-5485ea8a1f4e
 
 ### Performance analysis
 After setting `VISUALIZE` to `0` and monitoring the window title, we estimate the following average framerates for each algorithm for various boid counts:
