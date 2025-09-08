@@ -8,7 +8,7 @@ Project 1 - Flocking**
 
 ### Boids Simulation
 
-![simulation] ![](images/simulation.gif)
+![](images/simulation.gif)
 
 boids count = 100000
 
