@@ -17,18 +17,57 @@
 #include <cuda_gl_interop.h>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <fstream>
+
 // ================
 // Configuration
 // ================
 
 // LOOK-2.1 LOOK-2.3 - toggles for UNIFORM_GRID and COHERENT_GRID
-#define VISUALIZE 1
-#define UNIFORM_GRID 1
-#define COHERENT_GRID 1
+#define VISUALIZE 0
+#define UNIFORM_GRID 0
+#define COHERENT_GRID 0
+
+// Set to 1 to write fps collection data to a log file
+// fps is collected and documented for 20 seconds and then averaged
+#define DATA_COLLECTION 1
 
 // LOOK-1.2 - change this to adjust particle count in the simulation
 const int N_FOR_VIS = 5000;
 const float DT = 0.2f;
+
+
+// Helper Function to write a data collection log
+void writeDataCollectionRow(const double data[], int size) {
+  const char* dataPath = "data.csv";
+  std::ofstream dataFile(dataPath, std::ios::app);
+  if (!dataFile) {
+    return;
+  }
+  const int block_size = Boids::getBlockSize();
+  const int grid_looping_optimization = Boids::getGridLoopingOptimization();
+  const float grid_width_scale = Boids::getGridWidthScale();
+
+  dataFile << "Visualize: " << (VISUALIZE ? 1 : 0) << ", "
+    << "Uniform Grid: " << (UNIFORM_GRID ? 1 : 0) << ", "
+    << "Coherent_Grid: " << (COHERENT_GRID ? 1 : 0) << ", "
+    << "Boid Count:" << N_FOR_VIS << ", "
+    << "Block Size: " << block_size << ", "
+    << "Grid Looping Optimization: " << grid_looping_optimization << ", "
+    << "Grid Width Scale: " << grid_width_scale;
+
+  double sum = 0.0;
+  for (int i = 2; i < size; i++) {
+    sum += data[i];
+  }
+  dataFile << ", Average FPS:" << (sum / size) << ", Data: ";
+  for (int i = 2; i < size; i++) {
+    dataFile << data[i] << ", ";
+  }
+  dataFile << std::endl;
+}
+
+
 
 /**
 * C main function.
@@ -226,6 +265,12 @@ void initShaders(GLuint * program) {
     double timebase = 0;
     int frame = 0;
 
+    #if DATA_COLLECTION
+    double fpsData[22]; // Take 22 data points, ignore the first two
+    int sampleCount = 0;
+    bool wroteData = false;
+    #endif
+
     Boids::unitTest(); // LOOK-1.2 We run some basic example code to make sure
                        // your CUDA development setup is ready to go.
 
@@ -239,7 +284,21 @@ void initShaders(GLuint * program) {
         fps = frame / (time - timebase);
         timebase = time;
         frame = 0;
+        #if DATA_COLLECTION
+        if (!wroteData) {
+          if (sampleCount < 22) {
+            fpsData[sampleCount] = fps;
+            sampleCount++;
+          }
+          else {
+            writeDataCollectionRow(fpsData, sampleCount);
+            wroteData = true;
+            std::cout << "Collected Data" << std::endl;
+          }
+        }
+        #endif
       }
+
 
       runCUDA();
 

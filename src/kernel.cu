@@ -895,3 +895,17 @@ void Boids::unitTest() {
   checkCUDAErrorWithLine("cudaFree failed!");
   return;
 }
+
+// Getter functions for data collection
+
+int Boids::getBlockSize() {
+  return blockSize;
+}
+
+int Boids::getGridLoopingOptimization() {
+  return GRID_LOOPING_OPTIMIZATION;
+}
+
+float Boids::getGridWidthScale() {
+  return GRID_WIDTH_SCALE;
+}
