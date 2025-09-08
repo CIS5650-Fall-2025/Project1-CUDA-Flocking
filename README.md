@@ -129,4 +129,29 @@ The grid-loop optimisation offers a slight boost to performance. The 8-cell heur
 
 ![](images/performance-1v2.png)
 
-With 1 x MaxDist cell width (27 cells to check max), FPS was better across the board than 2 x maxDist cell width (8 cells to check max). This is because even though more cells are examined, each cell holds fewer boids so the heavy inner loops shrink a lot and there are less boids that need to be checked. The 8-cell heuristic produces more candidate boids to check although the number of cells is less. When cell width is twice the rule distance, there will likely be more boids not within the actual rule distance that we check.
+With 1 x MaxDist cell width (27 cells to check max), FPS was better across the board than 2 x maxDist cell width (8 cells to check max). This is because even though more cells are examined, each cell holds fewer boids so the heavy inner loops shrink a lot and there are less boids that need to be checked. The 8-cell heuristic produces more candidate boids to check although the number of cells is less - each cell has a higher number of boids. When cell width is twice the rule distance, there will likely be more boids not within the actual rule distance that we check.
+The number of boids checked by reducing cell width from 2 x maxDist to 1x is ~58% (see below).
+
+### If we assume boids are uniformly distributed with density p, grid cell width h:
+### h = 2R:
+
+- Cells visited:  
+  $\dfrac{2R}{h} = 1 \;\Rightarrow\; \big(\dfrac{2R}{h} + 1\big)^3 = 2^3 = 8$
+- Boids per cell:  
+  $\rho\,(2R)^3 = 8\rho R^3$
+- Boids checked:  
+  $8 \times 8\rho R^3 = \boxed{64\,\rho R^3}$
+
+---
+
+### h = R:
+
+- Cells visited:  
+  $\dfrac{2R}{h} = 2 \;\Rightarrow\; \big(\dfrac{2R}{h} + 1\big)^3 = 3^3 = 27$
+- Boids per cell:  
+  $\rho\,R^3$
+- Boids checked:  
+  $27 \times \rho R^3 = \boxed{27\,\rho R^3}$
+
+
+
