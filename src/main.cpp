@@ -8,7 +8,7 @@
 
 #include "main.hpp"
 #include "kernel.h"
-
+#include <cstdio>
 #include <iostream>
 #include <memory>
 #include <sstream>
@@ -22,13 +22,25 @@
 // ================
 
 // LOOK-2.1 LOOK-2.3 - toggles for UNIFORM_GRID and COHERENT_GRID
-#define VISUALIZE 1
+#define VISUALIZE 0
 #define UNIFORM_GRID 1
-#define COHERENT_GRID 0
+#define COHERENT_GRID 1
 
 // LOOK-1.2 - change this to adjust particle count in the simulation
-const int N_FOR_VIS = 5000;
+const int N_FOR_VIS = 100000;
 const float DT = 0.2f;
+
+#if UNIFORM_GRID&& COHERENT_GRID
+static const char* kMethodName = "coherent";
+#elif UNIFORM_GRID
+ static const char* kMethodName = "scattered";
+#else
+ static const char* kMethodName = "naive";
+#endif
+
+// Per-frame GPU timing (ms)
+static float g_step_ms = 0.0f;
+static float g_copy_ms = 0.0f;
 
 /**
 * C main function.
@@ -126,6 +138,12 @@ bool init(int argc, char **argv) {
 
   glEnable(GL_DEPTH_TEST);
 
+  std::printf("# device,%s\n", deviceName.c_str());
+  std::printf("# N,%d\n", N_FOR_VIS);
+  std::printf("# method,%s\n", kMethodName);
+  std::printf("N,method,fps,avg_frame_ms,avg_step_ms,avg_copy_ms\n");
+  std::fflush(stdout);
+
   return true;
 }
 
@@ -196,7 +214,15 @@ void initShaders(GLuint * program) {
     // Map OpenGL buffer object for writing from CUDA on a single GPU
     // No data is moved (Win & Linux). When mapped to CUDA, OpenGL should not
     // use this buffer
-
+          // Lazy-create CUDA events for GPU timing
+      static bool eventsInited = false;
+      static cudaEvent_t evStart, evAfterStep, evAfterCopy;
+      if (!eventsInited) {
+          cudaEventCreate(&evStart);
+          cudaEventCreate(&evAfterStep);
+          cudaEventCreate(&evAfterCopy);
+          eventsInited = true;
+      }
     float4 *dptr = NULL;
     float *dptrVertPositions = NULL;
     float *dptrVertVelocities = NULL;
@@ -204,6 +230,7 @@ void initShaders(GLuint * program) {
     cudaGLMapBufferObject((void**)&dptrVertPositions, boidVBO_positions);
     cudaGLMapBufferObject((void**)&dptrVertVelocities, boidVBO_velocities);
 
+    cudaEventRecord(evStart, 0);
     // execute the kernel
     #if UNIFORM_GRID && COHERENT_GRID
     Boids::stepSimulationCoherentGrid(DT);
@@ -212,10 +239,23 @@ void initShaders(GLuint * program) {
     #else
     Boids::stepSimulationNaive(DT);
     #endif
+    cudaEventRecord(evAfterStep, 0);
 
     #if VISUALIZE
     Boids::copyBoidsToVBO(dptrVertPositions, dptrVertVelocities);
     #endif
+
+    cudaEventRecord(evAfterCopy, 0);
+    cudaEventSynchronize(evAfterCopy);
+    cudaEventElapsedTime(&g_step_ms, evStart, evAfterStep);
+    float total_ms = 0.0f;
+    cudaEventElapsedTime(&total_ms, evStart, evAfterCopy);
+    #if VISUALIZE
+         g_copy_ms = total_ms - g_step_ms;
+    #else
+         g_copy_ms = 0.0f;
+    #endif
+
     // unmap buffer object
     cudaGLUnmapBufferObject(boidVBO_positions);
     cudaGLUnmapBufferObject(boidVBO_velocities);
@@ -225,11 +265,15 @@ void initShaders(GLuint * program) {
     double fps = 0;
     double timebase = 0;
     int frame = 0;
-
+    double frameSumMs = 0.0;
+    double stepSumMs = 0.0;
+    double copySumMs = 0.0;
+    int samples = 0;
     Boids::unitTest(); // LOOK-1.2 We run some basic example code to make sure
                        // your CUDA development setup is ready to go.
 
     while (!glfwWindowShouldClose(window)) {
+      double frameStart = glfwGetTime();
       glfwPollEvents();
 
       frame++;
@@ -237,8 +281,22 @@ void initShaders(GLuint * program) {
 
       if (time - timebase > 1.0) {
         fps = frame / (time - timebase);
-        timebase = time;
+        //timebase = time;
+        //frame = 0;
+        // Print CSV line with per-second averages
+        double avgFrame = (samples > 0) ? (frameSumMs / samples) : 0.0;
+        double avgStep = (samples > 0) ? (stepSumMs / samples) : 0.0;
+        double avgCopy = (samples > 0) ? (copySumMs / samples) : 0.0;
+        std::printf("%d,%s,%.1f,%.3f,%.3f,%.3f\n",
+            N_FOR_VIS, kMethodName, fps, avgFrame, avgStep, avgCopy);
+        std::fflush(stdout);
+                // Reset counters for next second
+            timebase = time;
         frame = 0;
+        frameSumMs = 0.0;
+        stepSumMs = 0.0;
+        copySumMs = 0.0;
+        samples = 0;
       }
 
       runCUDA();
@@ -264,6 +322,11 @@ void initShaders(GLuint * program) {
 
       glfwSwapBuffers(window);
       #endif
+      // End-of-frame timing and accumulation
+      double frameEnd = glfwGetTime();
+      double frameMs = (frameEnd - frameStart) * 1000.0;
+      frameSumMs += frameMs;
+      stepSumMs += g_step_ms, copySumMs += g_copy_ms, samples++;
     }
     glfwDestroyWindow(window);
     glfwTerminate();
