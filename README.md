@@ -1,11 +1,14 @@
-**University of Pennsylvania, CIS 5650: GPU Programming and Architecture,
-Project 1 - Flocking**
+**University of Pennsylvania, CIS 5650: GPU Programming and Architecture, Project 1 - Flocking**  
 
-* (TODO) YOUR NAME HERE
-  * (TODO) [LinkedIn](), [personal website](), [twitter](), etc.
-* Tested on: (TODO) Windows 22, i7-2222 @ 2.22GHz 22GB, GTX 222 222MB (Moore 2222 Lab)
+* **Name:** Vismay Churiwala  
+  * [LinkedIn](https://www.linkedin.com/in/vismay-churiwala-8b0073190/) | [Website](https://vismaychuriwala.com/)
 
-### (TODO: Your README)
+* **System Specs (Personal Machine):**  
+  * OS: Windows 11  
+  * CPU: AMD Ryzen 7 5800H with Radeon Graphics (8C/16T, 3.2GHz base)  
+  * RAM: 32GB DDR4  
+  * GPU: NVIDIA GeForce RTX 3060 Laptop GPU (6GB GDDR6)  
+  * CUDA Toolkit: 13.0  
+  * Driver Version: 581.15  
 
-Include screenshots, analysis, etc. (Remember, this is public, so don't put
-anything here that you don't want to share with the world.)
+---
