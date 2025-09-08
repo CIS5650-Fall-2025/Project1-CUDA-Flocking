@@ -7,6 +7,12 @@
 Project 1 CUDA Flocking
 ====================
 
+This project implements a GPU-accelerated simulation of flocking behavior in CUDA using three different versions: a naive all-pairs implementation, a uniform grid with scattered memory access, and a coherent grid with improved memory locality. Performance comparisons show how spatial partitioning and memory layout optimizations enable scaling to tens of thousands of boids in real time.
+
+![Flocking Animation](images/boids.gif)
+<br>
+<sub>*CUDA flocking simulation (50,000 boids) using the coherent uniform grid implementation.*</sub>
+
 ## Implementation
 
 As per the project instruction, I implemented three different Boid flocking simulations.
@@ -136,6 +142,10 @@ Finally I tested the effect of calculating distance with periodic wrapping acros
 ![Wrapping Cost](images/wrap_cost.png)
 
 Despite some optimizations, the simple GPU version suffers the most from wrapping. At 1000 boids it drops from ~246 FPS to ~153 FPS and at 10k boids it goes from ~21 FPS to ~12 FPS. This makes sense since every extra branch in the distance check is executed $O(n^2)$ times. The uniform and coherent grid versions are hit less hard. At 10k boids the uniform grid drops from ~191 FPS to ~158 FPS and the coherent grid drops from ~196 FPS to ~160 FPS. The overhead is still there but since the number of distance checks is reduced by the grid, the effect is smaller. Overall, wrapping clearly adds extra cost, but the impact is only severe in the naive version. For the grid-based approaches the FPS loss is noticeable but not catastrophic. The intent behind adding this was to have a more "correct" implementation (since if the boids can move across the simulation boundaries, that implies a periodic simulation box), but I can't comment on how useful this actually is since the visual result doesn't show any meaningful differences between the two approaches.
+
+![Flocking Animation](images/boids_wrapped.gif)
+<br>
+<sub>*Simulation with periodic boundary wrapping enabled. Visual behavior remains the same, but performance is reduced due to additional distance checks.*</sub>
 
 <details>
   <summary>Raw Data</summary>
