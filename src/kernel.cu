@@ -517,6 +517,10 @@ __global__ void kernUpdateVelNeighborSearchScattered(
     float fy = cy - gridIndex3D.y;
     float fz = cz - gridIndex3D.z;
 
+    /// 
+    /// EXTRA CREDIT: adaptive neibour cell search
+    /// 
+
     float maxdistOfRules = fmaxf(fmaxf(rule1Distance, rule2Distance), rule3Distance);
     float maxR = maxdistOfRules * inverseCellWidth;
 
@@ -641,6 +645,10 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
         float fx = cx - gridIndex3D.x;
         float fy = cy - gridIndex3D.y;
         float fz = cz - gridIndex3D.z;
+
+        /// 
+        /// EXTRA CREDIT: adaptive neibour cell search
+        /// 
 
         float maxdistOfRules = fmaxf(fmaxf(rule1Distance, rule2Distance), rule3Distance);
         float maxR = maxdistOfRules * inverseCellWidth;
