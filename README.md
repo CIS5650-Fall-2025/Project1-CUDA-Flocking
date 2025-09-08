@@ -40,7 +40,7 @@ The above shows the full simulation process with 100,000 boids.
   Performance decreases extremely rapidly as the number of boids grows (e.g., ~4400 fps at 100 boids → ~3.5 fps at 100,000 boids without visualization). This is because the algorithm is O(N²): every boid checks all others, so computation explodes as population increases.
 
 - **Uniform grid:**  
-  Performance decreases much more gradually. The grid restricts neighbor checks to nearby cells, so the complexity is closer to O(N) in practice. This allows it to scale far better than the naive method.
+  Performance decreases much more gradually. The grid restricts neighbor checks to nearby cells, so the complexity is closer to O(N) in practice. This allows it to scale far better than the naive method. Using 8 cells in the coherent path reduces a small constant cost as well.
 
 - **Coherent grid:**  
   Similar to the uniform grid at small scales, but consistently faster at larger scales. The improvement comes from reordering boids in memory so neighbors are contiguous, which enables coalesced global memory access and reduces latency.
@@ -66,10 +66,13 @@ Yes. The coherent grid consistently outperformed the standard uniform grid. This
 
 In addition, when looping through neighboring cells, we iterate from the z-axis outward (z → y → x) instead of starting with x. This ordering matches the row-major storage layout of 3D arrays, where x varies fastest, followed by y, then z. By looping over z first, threads in the same warp are more likely to access contiguous memory addresses, reducing stride jumps and improving coalesced memory access. This further enhances the performance benefits of the coherent grid.
 
+Finally, with cellWidth = 2×r the coherent pass correctly checks only 8 cells (the current cell plus the half-space neighbor along each axis), which gives a modest constant-factor gain over a 27-cell sweep; if cellWidth is smaller than 2×r we revert to 27 cells to remain correct.
+
 ---
 
 ### Q4. Did changing cell width and checking 27 vs 8 neighboring cells affect performance? Why or why not?
 
-The choice of cell width strongly affects performance. If it is too large, each cell holds many boids and creates unnecessary checks; if too small, most cells are empty and add overhead. The best width is usually close to the boid interaction radius.
+Changing cell width had the largest impact on performance; switching between 27 and 8 neighbor cells only helped modestly and only when the width was set correctly. With 
+cellWidth≈2𝑟, valid neighbors lie in the current cell or the half-space cell along each axis, so visiting 8 cells is both correct and a bit faster than 27 because it reduces header checks and branches—especially in the coherent grid where data is contiguous. If the cell width is smaller than 2𝑟, you must scan 27 cells to remain correct. If the cell width is much larger than 2𝑟, the inner loop slows down because each visited cell holds many boids, regardless of 8 vs 27. Overall, runtime is dominated by how many boids are actually iterated per thread.
 
 ---

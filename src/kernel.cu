@@ -544,9 +544,17 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
       return;
   }
   glm::vec3 currPos = pos[sortedIdx];
-  int iX = floor((currPos.x - gridMin.x) * inverseCellWidth);
-  int iY = floor((currPos.y - gridMin.y) * inverseCellWidth);
-  int iZ = floor((currPos.z - gridMin.z) * inverseCellWidth);
+  float fX = (currPos.x - gridMin.x) * inverseCellWidth;
+  float fY = (currPos.y - gridMin.y) * inverseCellWidth;
+  float fZ = (currPos.z - gridMin.z) * inverseCellWidth;
+
+  int iX = floor(fX);
+  int iY = floor(fY);
+  int iZ = floor(fZ);
+
+  int offX = ((fX - (float)iX) < 0.5f) ? -1 : +1;
+  int offY = ((fY - (float)iY) < 0.5f) ? -1 : +1;
+  int offZ = ((fZ - (float)iZ) < 0.5f) ? -1 : +1;
 
   int rule1Neighbors = 0;
   int rule3Neighbors = 0;
@@ -554,13 +562,16 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
   glm::vec3 c = glm::vec3(0.0f);
   glm::vec3 perceived_velocity = glm::vec3(0.0f);
   // - Identify which cells may contain neighbors. This isn't always 8.
-  for (int k = -1; k <= 1; ++k) {      
+  for (int k = -1; k <= 1; ++k) {    
+      if (k != 0 && k != offZ) continue;
       int z = iZ + k; 
       if (z < 0 || z >= gridResolution) continue;
       for (int j = -1; j <= 1; ++j) {
+          if (j != 0 && j != offY) continue;
           int y = iY + j; 
           if (y < 0 || y >= gridResolution) continue;
           for (int i = -1; i <= 1; ++i) {
+              if (i != 0 && i != offX) continue;
               int x = iX + i; 
               if (x < 0 || x >= gridResolution) continue;
 
