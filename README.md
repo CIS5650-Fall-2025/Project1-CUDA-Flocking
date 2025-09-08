@@ -28,11 +28,18 @@ For testing, I developed a custom PerfTimer class to measure the performance of 
 
 ### Performance with different number of boids 
 
-| # of boids | Avg FPS(Brute force) | Avg FPS(Scattered Grid) | Avg FPS(Coherent Grid) |
+| # of boids |FPS(Brute force) | FPS(Scattered Grid) | FPS(Coherent Grid) |
 | :--- | :--- | :--- | :--- |
 | 1000 | 51.3 | 292.9 | 291 |
 | 5000 | 6.3 | 116.6 | 120.4 |
 | 10000 | 1.1 | 66.9 | 68.9 |
 | 50000 | 0.4 | 12 | 11.9 |
-| 100000 | 0.00929732 | 4.93 | 4.82 |
-| 500000 | 0 | 0.281402 | 0.267018 |
+| 100000 | 0.00929732 | 4.93 | 5.82 |
+| 500000 | 0 | 0.281402 | 0.567018 |
+
+![](images/graph-1.png)
+
+### For each implementation, how does changing the number of boids affect performance? Why do you think this is?
+Brute force: The brute force implementation uses and O(N^2) method, in which every boid checks every other boid in the simulation to apply the flocking rules. So thus, as N grows the number of comparisons increases quadratically. This can be 
+seen by the results, in which the data shows sharp and non-linear drops in performance as the number of boids increase. In particular, the jump from 1k -> 5k boids causes the FPS to plummet from 51.3 to 6.3.
+Scattered and Coherent grid implementations show a much more gradual decrease in performance compared to brute force. This is because both approximates to an O(N) complexity because in the simulation, it divides the space into grids, thus each grid needs to only check its neighboring grid. Which drastically reduces its time complexity. Scattered and Coherent grids differ by the fact that Coherent grids have memory that are reordered, which means that boids that are close in the space are also closer in memory. This is why you can see in the grid, that the Coherent Grid performs better than Scattered grids. 
