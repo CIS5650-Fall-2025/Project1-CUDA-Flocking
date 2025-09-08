@@ -23,6 +23,7 @@
 
 // LOOK-2.1 LOOK-2.3 - toggles for UNIFORM_GRID and COHERENT_GRID
 #define VISUALIZE 1
+#define CPU_SIM 1
 #define UNIFORM_GRID 0
 #define COHERENT_GRID 0
 
@@ -37,7 +38,12 @@ int main(int argc, char* argv[]) {
   projectName = "5650 CUDA Intro: Boids";
 
   if (init(argc, argv)) {
-    mainLoop();
+      if (VISUALIZE == 1) {
+          mainLoop();
+      }
+      else {
+          benchmarkLoop(1000);
+      }
     Boids::endSimulation();
     return 0;
   } else {
@@ -179,6 +185,10 @@ void initShaders(GLuint * program) {
     "shaders/boid.vert.glsl",
     "shaders/boid.geom.glsl",
     "shaders/boid.frag.glsl", attributeLocations, 2);
+  if (program[PROG_BOID] == 0) {
+      std::cerr << "[ERROR] Shader program creation failed! Probably due to missing or bad shader files." << std::endl;
+      exit(EXIT_FAILURE);
+  }
     glUseProgram(program[PROG_BOID]);
 
     if ((location = glGetUniformLocation(program[PROG_BOID], "u_projMatrix")) != -1) {
@@ -205,7 +215,9 @@ void initShaders(GLuint * program) {
     cudaGLMapBufferObject((void**)&dptrVertVelocities, boidVBO_velocities);
 
     // execute the kernel
-    #if UNIFORM_GRID && COHERENT_GRID
+    #if CPU_SIM
+    Boids::stepSimulationCPU(DT);
+    #elif UNIFORM_GRID && COHERENT_GRID
     Boids::stepSimulationCoherentGrid(DT);
     #elif UNIFORM_GRID
     Boids::stepSimulationScatteredGrid(DT);
@@ -221,11 +233,36 @@ void initShaders(GLuint * program) {
     cudaGLUnmapBufferObject(boidVBO_velocities);
   }
 
+  // Self written helper to standardize testing for performance reporting
+  void benchmarkLoop(int numFrames) {
+      // Warm-up (to let framerate stabilize before we measure)
+      for (int i = 0; i < 50; i++) {
+          runCUDA();
+          glfwPollEvents();
+      }
+      // Actual timing
+      double timeStart = glfwGetTime();
+      for (int i = 0; i < numFrames; i++) {
+          runCUDA();
+          glfwPollEvents();
+      }
+
+      double timeEnd = glfwGetTime();
+      double elapsed = timeEnd - timeStart;
+      double avgFPS = numFrames / elapsed;
+
+      std::cout << "Benchmark over " << numFrames << " frames: "
+          << avgFPS << " FPS ("
+          << (1000.0 / avgFPS) << " ms/frame)"
+          << std::endl;
+      glfwDestroyWindow(window);
+      glfwTerminate();
+  }
+
   void mainLoop() {
     double fps = 0;
     double timebase = 0;
     int frame = 0;
-
     Boids::unitTest(); // LOOK-1.2 We run some basic example code to make sure
                        // your CUDA development setup is ready to go.
 
