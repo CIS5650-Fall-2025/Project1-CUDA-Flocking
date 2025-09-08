@@ -1,5 +1,3 @@
-#define GLM_FORCE_CUDA
-
 #include <cuda.h>
 #include "kernel.h"
 #include "utilityCore.hpp"
@@ -47,7 +45,7 @@ void checkCUDAError(const char* msg, int line = -1) {
 *****************/
 
 /*! Block size used for CUDA kernel launch. */
-#define blockSize 128
+#define blockSize 1024
 
 // LOOK-1.2 Parameters for the boids algorithm.
 // These worked well in our reference implementation.
@@ -241,8 +239,8 @@ __global__ void kernCopyVelocitiesToVBO(int N, glm::vec3* vel, float* vbo, float
 void Boids::copyBoidsToVBO(float* vbodptr_positions, float* vbodptr_velocities) {
 	dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
 
-	kernCopyPositionsToVBO <<<fullBlocksPerGrid, blockSize >> > (numObjects, dev_pos, vbodptr_positions, scene_scale);
-	kernCopyVelocitiesToVBO <<<fullBlocksPerGrid, blockSize >> > (numObjects, dev_vel1, vbodptr_velocities, scene_scale);
+	kernCopyPositionsToVBO << <fullBlocksPerGrid, blockSize >> > (numObjects, dev_pos, vbodptr_positions, scene_scale);
+	kernCopyVelocitiesToVBO << <fullBlocksPerGrid, blockSize >> > (numObjects, dev_vel1, vbodptr_velocities, scene_scale);
 
 	checkCUDAErrorWithLine("copyBoidsToVBO failed!");
 
@@ -673,8 +671,8 @@ void Boids::stepSimulationNaive(float dt) {
 
 
 	dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
-	kernUpdateVelocityBruteForce <<<fullBlocksPerGrid, blockSize >>> (numObjects, dev_pos, dev_vel1, dev_vel2);
-	kernUpdatePos <<<fullBlocksPerGrid, blockSize >>> (numObjects, dt, dev_pos, dev_vel2);
+	kernUpdateVelocityBruteForce << <fullBlocksPerGrid, blockSize >> > (numObjects, dev_pos, dev_vel1, dev_vel2);
+	kernUpdatePos << <fullBlocksPerGrid, blockSize >> > (numObjects, dt, dev_pos, dev_vel2);
 
 	// TODO-1.2 ping-pong the velocity buffers
 	glm::vec3* temp = dev_vel1;
@@ -696,14 +694,14 @@ void Boids::stepSimulationScatteredGrid(float dt) {
 	// - Update positions
 	// - Ping-pong buffers as needed
 	dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
-	kernComputeIndices <<<fullBlocksPerGrid, blockSize >> > (numObjects, gridSideCount, gridMinimum, gridInverseCellWidth, dev_pos, dev_particleArrayIndices, dev_particleGridIndices);
+	kernComputeIndices << <fullBlocksPerGrid, blockSize >> > (numObjects, gridSideCount, gridMinimum, gridInverseCellWidth, dev_pos, dev_particleArrayIndices, dev_particleGridIndices);
 
 	dev_thrust_particleArrayIndices = thrust::device_ptr<int>(dev_particleArrayIndices);
 	dev_thrust_particleGridIndices = thrust::device_ptr<int>(dev_particleGridIndices);
 	thrust::sort_by_key(dev_thrust_particleGridIndices, dev_thrust_particleGridIndices + numObjects, dev_thrust_particleArrayIndices);
-	kernResetIntBuffer <<<fullBlocksPerGrid, blockSize >>> (gridCellCount, dev_gridCellStartIndices, -1);
-	kernResetIntBuffer <<<fullBlocksPerGrid, blockSize >>> (gridCellCount, dev_gridCellEndIndices, -1);
-	kernIdentifyCellStartEnd <<<fullBlocksPerGrid, blockSize >>> (numObjects, dev_particleGridIndices, dev_gridCellStartIndices, dev_gridCellEndIndices);
+	kernResetIntBuffer << <fullBlocksPerGrid, blockSize >> > (gridCellCount, dev_gridCellStartIndices, -1);
+	kernResetIntBuffer << <fullBlocksPerGrid, blockSize >> > (gridCellCount, dev_gridCellEndIndices, -1);
+	kernIdentifyCellStartEnd << <fullBlocksPerGrid, blockSize >> > (numObjects, dev_particleGridIndices, dev_gridCellStartIndices, dev_gridCellEndIndices);
 
 	kernUpdateVelNeighborSearchScattered << <fullBlocksPerGrid, blockSize >> > (numObjects, gridSideCount, gridMinimum, gridInverseCellWidth, gridCellWidth, dev_gridCellStartIndices, dev_gridCellEndIndices, dev_particleArrayIndices, dev_pos, dev_vel1, dev_vel2);
 	kernUpdatePos << <fullBlocksPerGrid, blockSize >> > (numObjects, dt, dev_pos, dev_vel2);
@@ -745,20 +743,20 @@ void Boids::stepSimulationCoherentGrid(float dt) {
 
 	dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
 
-	kernComputeIndices <<<fullBlocksPerGrid, blockSize >>> (numObjects, gridSideCount, gridMinimum, gridInverseCellWidth, dev_pos, dev_particleArrayIndices, dev_particleGridIndices);
+	kernComputeIndices << <fullBlocksPerGrid, blockSize >> > (numObjects, gridSideCount, gridMinimum, gridInverseCellWidth, dev_pos, dev_particleArrayIndices, dev_particleGridIndices);
 
 	dev_thrust_particleArrayIndices = thrust::device_ptr<int>(dev_particleArrayIndices);
 	dev_thrust_particleGridIndices = thrust::device_ptr<int>(dev_particleGridIndices);
 	thrust::sort_by_key(dev_thrust_particleGridIndices, dev_thrust_particleGridIndices + numObjects, dev_thrust_particleArrayIndices);
 
-	kernResetIntBuffer <<<fullBlocksPerGrid, blockSize >>> (gridCellCount, dev_gridCellStartIndices, -1);
-	kernResetIntBuffer <<<fullBlocksPerGrid, blockSize >>> (gridCellCount, dev_gridCellEndIndices, -1);
+	kernResetIntBuffer << <fullBlocksPerGrid, blockSize >> > (gridCellCount, dev_gridCellStartIndices, -1);
+	kernResetIntBuffer << <fullBlocksPerGrid, blockSize >> > (gridCellCount, dev_gridCellEndIndices, -1);
 
-	kernIdentifyCellStartEnd <<<fullBlocksPerGrid, blockSize >>> (numObjects, dev_particleGridIndices, dev_gridCellStartIndices, dev_gridCellEndIndices);
-	kernReshuffleParticleData <<<fullBlocksPerGrid, blockSize >>> (numObjects, dev_particleArrayIndices, dev_pos, dev_vel1, dev_pos_coherent, dev_vel1_coherent);
+	kernIdentifyCellStartEnd << <fullBlocksPerGrid, blockSize >> > (numObjects, dev_particleGridIndices, dev_gridCellStartIndices, dev_gridCellEndIndices);
+	kernReshuffleParticleData << <fullBlocksPerGrid, blockSize >> > (numObjects, dev_particleArrayIndices, dev_pos, dev_vel1, dev_pos_coherent, dev_vel1_coherent);
 
-	kernUpdateVelNeighborSearchCoherent <<<fullBlocksPerGrid, blockSize >>> (numObjects, gridSideCount, gridMinimum, gridInverseCellWidth, gridCellWidth, dev_gridCellStartIndices, dev_gridCellEndIndices, dev_pos_coherent, dev_vel1_coherent, dev_vel2_coherent);
-	kernUpdatePos <<<fullBlocksPerGrid, blockSize >>> (numObjects, dt, dev_pos_coherent, dev_vel2_coherent);
+	kernUpdateVelNeighborSearchCoherent << <fullBlocksPerGrid, blockSize >> > (numObjects, gridSideCount, gridMinimum, gridInverseCellWidth, gridCellWidth, dev_gridCellStartIndices, dev_gridCellEndIndices, dev_pos_coherent, dev_vel1_coherent, dev_vel2_coherent);
+	kernUpdatePos << <fullBlocksPerGrid, blockSize >> > (numObjects, dt, dev_pos_coherent, dev_vel2_coherent);
 
 	cudaMemcpy(dev_pos, dev_pos_coherent, numObjects * sizeof(glm::vec3), cudaMemcpyDeviceToDevice);
 	cudaMemcpy(dev_vel1, dev_vel2_coherent, numObjects * sizeof(glm::vec3), cudaMemcpyDeviceToDevice);
