@@ -24,7 +24,7 @@ Project 1 - Flocking**
 
 #### Framerates (without (and with) Visualization) for Different Number of Boids and Implementations
 
-![](images/Framerates (without (and with) Visualization) for Different Number of Boids and Implementations.png)
+![Framerates for Different Number of Boids and Implementations](images/Framerates for Different Number of Boids and Implementations.png)
 
 | #Boids    | Naive       | Scattered Uniform Grid | Coherent Uniform Grid |
 |-----------|-------------|------------------------|-----------------------|
@@ -39,7 +39,7 @@ Project 1 - Flocking**
 
 #### Framerates (without Visualization) for Different Block Sizes and Implementations
 
-![](Framerates (images/without Visualization) for Different Block Sizes and Implementations.png)
+![Framerates for Different Block Sizes and Implementations](images/Framerates for Different Block Sizes and Implementations.png)
 
 | Block Size | Naive | Scattered Uniform Grid | Coherent Uniform Grid |
 |------------|-------|------------------------|-----------------------|
