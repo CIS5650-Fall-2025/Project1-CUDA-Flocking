@@ -7,6 +7,9 @@
 */
 
 #include "main.hpp"
+
+#include <chrono>
+
 #include "kernel.h"
 
 #include <iostream>
@@ -15,6 +18,7 @@
 
 #include <cuda_runtime.h>
 #include <cuda_gl_interop.h>
+#include <iomanip>
 #include <glm/gtc/matrix_transform.hpp>
 
 // ================
@@ -22,14 +26,14 @@
 // ================
 
 // LOOK-2.1 LOOK-2.3 - toggles for UNIFORM_GRID and COHERENT_GRID
-#define VISUALIZE 1
-#define UNIFORM_GRID 0
-#define COHERENT_GRID 0
+#define VISUALIZE 0
+#define UNIFORM_GRID 1
+#define COHERENT_GRID 1
+
 
 // LOOK-1.2 - change this to adjust particle count in the simulation
-const int N_FOR_VIS = 5000;
+const int N_FOR_VIS = 50000;
 const float DT = 0.2f;
-
 /**
 * C main function.
 */
@@ -226,26 +230,29 @@ void initShaders(GLuint * program) {
     double timebase = 0;
     int frame = 0;
 
+    auto start = std::chrono::high_resolution_clock::now();
     Boids::unitTest(); // LOOK-1.2 We run some basic example code to make sure
                        // your CUDA development setup is ready to go.
 
     while (!glfwWindowShouldClose(window)) {
       glfwPollEvents();
-
+      //system("pause");
       frame++;
       double time = glfwGetTime();
 
-      if (time - timebase > 1.0) {
+      if (time - timebase > 3.0) {
         fps = frame / (time - timebase);
         timebase = time;
         frame = 0;
       }
-
+   //   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start);
+	  //start = std::chrono::high_resolution_clock::now();
+	  //std::cout << duration.count() / 1000.0f << " ms" << std::endl;
       runCUDA();
 
       std::ostringstream ss;
       ss << "[";
-      ss.precision(1);
+      ss.precision(3);
       ss << std::fixed << fps;
       ss << " fps] " << deviceName;
       glfwSetWindowTitle(window, ss.str().c_str());
