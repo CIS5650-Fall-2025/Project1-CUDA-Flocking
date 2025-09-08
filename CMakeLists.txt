@@ -83,6 +83,25 @@ endif()
 target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE "$<$<AND:$<CONFIG:Debug,RelWithDebInfo>,$<COMPILE_LANGUAGE:CUDA>>:-G>")
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${CMAKE_PROJECT_NAME})
 
+set(N_FOR_VIS 5000 CACHE STRING "Number of boids to simulate")
+option(VISUALIZE "Turn on OpenGL visualization" ON)
+option(UNIFORM_GRID "Use uniform grids for efficient neighbor checks" OFF)
+option(COHERENT_GRID "Use semi-coherent memory access for uniform grids" OFF)
+set(CUDA_BLOCK_SIZE 128 CACHE STRING "CUDA block size")
+option(FPS_MEASURE "Enable frame rate measurements" OFF)
+set(FPS_MEASURE_START 2 CACHE STRING "Seconds after start to begin frame rate measurements")
+set(FPS_MEASURE_DURATION 20 CACHE STRING "Number of seconds to measure frame rates for")
+target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
+    N_FOR_VIS=${N_FOR_VIS}
+    VISUALIZE=$<IF:$<BOOL:${VISUALIZE}>,1,0>
+    UNIFORM_GRID=$<IF:$<BOOL:${UNIFORM_GRID}>,1,0>
+    COHERENT_GRID=$<IF:$<BOOL:${COHERENT_GRID}>,1,0>
+    CUDA_BLOCK_SIZE=${CUDA_BLOCK_SIZE}
+    FPS_MEASURE=$<IF:$<BOOL:${FPS_MEASURE}>,1,0>
+    FPS_MEASURE_START=${FPS_MEASURE_START}
+    FPS_MEASURE_DURATION=${FPS_MEASURE_DURATION}
+)
+
 add_custom_command(
     TARGET ${CMAKE_PROJECT_NAME}
     PRE_BUILD

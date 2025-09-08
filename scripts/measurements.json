@@ -1,0 +1,776 @@
+[
+    {
+        "N_FOR_VIS": 5000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 0,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 44.203033208847046,
+        "fps": 1046.74
+    },
+    {
+        "N_FOR_VIS": 10000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 0,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 43.1745982170105,
+        "fps": 568.195
+    },
+    {
+        "N_FOR_VIS": 20000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 0,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 43.60326099395752,
+        "fps": 292.995
+    },
+    {
+        "N_FOR_VIS": 40000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 0,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 44.27167773246765,
+        "fps": 145.484
+    },
+    {
+        "N_FOR_VIS": 80000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 0,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 45.28588128089905,
+        "fps": 69.7938
+    },
+    {
+        "N_FOR_VIS": 160000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 0,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 50.25538349151611,
+        "fps": 22.465
+    },
+    {
+        "N_FOR_VIS": 320000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 0,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 65.90151405334473,
+        "fps": 7.7314
+    },
+    {
+        "N_FOR_VIS": 640000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 0,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 128.41546368598938,
+        "fps": 2.03272
+    },
+    {
+        "N_FOR_VIS": 5000,
+        "VISUALIZE": 1,
+        "UNIFORM_GRID": 0,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 43.73953151702881,
+        "fps": 655.841
+    },
+    {
+        "N_FOR_VIS": 10000,
+        "VISUALIZE": 1,
+        "UNIFORM_GRID": 0,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 43.65591502189636,
+        "fps": 428.96
+    },
+    {
+        "N_FOR_VIS": 20000,
+        "VISUALIZE": 1,
+        "UNIFORM_GRID": 0,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 42.70334196090698,
+        "fps": 250.791
+    },
+    {
+        "N_FOR_VIS": 40000,
+        "VISUALIZE": 1,
+        "UNIFORM_GRID": 0,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 42.65804052352905,
+        "fps": 133.894
+    },
+    {
+        "N_FOR_VIS": 80000,
+        "VISUALIZE": 1,
+        "UNIFORM_GRID": 0,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 42.89132761955261,
+        "fps": 66.7832
+    },
+    {
+        "N_FOR_VIS": 160000,
+        "VISUALIZE": 1,
+        "UNIFORM_GRID": 0,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 42.69033741950989,
+        "fps": 22.0379
+    },
+    {
+        "N_FOR_VIS": 320000,
+        "VISUALIZE": 1,
+        "UNIFORM_GRID": 0,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 42.92023468017578,
+        "fps": 7.66773
+    },
+    {
+        "N_FOR_VIS": 640000,
+        "VISUALIZE": 1,
+        "UNIFORM_GRID": 0,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 43.798166275024414,
+        "fps": 2.02442
+    },
+    {
+        "N_FOR_VIS": 1280000,
+        "VISUALIZE": 1,
+        "UNIFORM_GRID": 0,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 47.52028465270996,
+        "fps": 0.521986
+    },
+    {
+        "N_FOR_VIS": 5000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 42.461591720581055,
+        "fps": 958.299
+    },
+    {
+        "N_FOR_VIS": 10000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 42.61020803451538,
+        "fps": 589.327
+    },
+    {
+        "N_FOR_VIS": 20000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 42.68756914138794,
+        "fps": 442.001
+    },
+    {
+        "N_FOR_VIS": 40000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 42.548766136169434,
+        "fps": 522.165
+    },
+    {
+        "N_FOR_VIS": 80000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 42.66075253486633,
+        "fps": 743.231
+    },
+    {
+        "N_FOR_VIS": 160000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 44.09012031555176,
+        "fps": 293.654
+    },
+    {
+        "N_FOR_VIS": 320000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 42.782997369766235,
+        "fps": 106.319
+    },
+    {
+        "N_FOR_VIS": 640000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 42.71744155883789,
+        "fps": 27.8156
+    },
+    {
+        "N_FOR_VIS": 1280000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 43.25354599952698,
+        "fps": 7.28699
+    },
+    {
+        "N_FOR_VIS": 2560000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 47.27662920951843,
+        "fps": 1.82766
+    },
+    {
+        "N_FOR_VIS": 5120000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 50.116435050964355,
+        "fps": 0.414361
+    },
+    {
+        "N_FOR_VIS": 5000,
+        "VISUALIZE": 1,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 42.821863412857056,
+        "fps": 644.899
+    },
+    {
+        "N_FOR_VIS": 10000,
+        "VISUALIZE": 1,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 42.98305082321167,
+        "fps": 465.404
+    },
+    {
+        "N_FOR_VIS": 20000,
+        "VISUALIZE": 1,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 42.776681423187256,
+        "fps": 360.091
+    },
+    {
+        "N_FOR_VIS": 40000,
+        "VISUALIZE": 1,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 42.6782431602478,
+        "fps": 412.795
+    },
+    {
+        "N_FOR_VIS": 80000,
+        "VISUALIZE": 1,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 42.749834060668945,
+        "fps": 527.235
+    },
+    {
+        "N_FOR_VIS": 160000,
+        "VISUALIZE": 1,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 43.14181137084961,
+        "fps": 247.048
+    },
+    {
+        "N_FOR_VIS": 320000,
+        "VISUALIZE": 1,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 42.73616361618042,
+        "fps": 97.857
+    },
+    {
+        "N_FOR_VIS": 640000,
+        "VISUALIZE": 1,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 42.8280508518219,
+        "fps": 27.0342
+    },
+    {
+        "N_FOR_VIS": 1280000,
+        "VISUALIZE": 1,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 43.40219831466675,
+        "fps": 7.20331
+    },
+    {
+        "N_FOR_VIS": 2560000,
+        "VISUALIZE": 1,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 44.618659019470215,
+        "fps": 1.82106
+    },
+    {
+        "N_FOR_VIS": 5120000,
+        "VISUALIZE": 1,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 47.5959370136261,
+        "fps": 0.413284
+    },
+    {
+        "N_FOR_VIS": 5000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 1,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 42.71804666519165,
+        "fps": 1135.14
+    },
+    {
+        "N_FOR_VIS": 10000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 1,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 42.91846418380737,
+        "fps": 865.777
+    },
+    {
+        "N_FOR_VIS": 20000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 1,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 43.01053261756897,
+        "fps": 701.909
+    },
+    {
+        "N_FOR_VIS": 40000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 1,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 42.874247312545776,
+        "fps": 1042.33
+    },
+    {
+        "N_FOR_VIS": 80000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 1,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 42.4565954208374,
+        "fps": 1519.27
+    },
+    {
+        "N_FOR_VIS": 160000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 1,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 42.467087268829346,
+        "fps": 1569.35
+    },
+    {
+        "N_FOR_VIS": 320000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 1,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 43.373146772384644,
+        "fps": 1171.87
+    },
+    {
+        "N_FOR_VIS": 640000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 1,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 44.91142654418945,
+        "fps": 511.487
+    },
+    {
+        "N_FOR_VIS": 1280000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 1,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 43.298893213272095,
+        "fps": 158.571
+    },
+    {
+        "N_FOR_VIS": 2560000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 1,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 44.740660190582275,
+        "fps": 42.4765
+    },
+    {
+        "N_FOR_VIS": 5120000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 1,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 43.085238456726074,
+        "fps": 10.9008
+    },
+    {
+        "N_FOR_VIS": 10240000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 1,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 44.24397420883179,
+        "fps": 2.757
+    },
+    {
+        "N_FOR_VIS": 20480000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 1,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 47.529356479644775,
+        "fps": 0.689126
+    },
+    {
+        "N_FOR_VIS": 5000,
+        "VISUALIZE": 1,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 1,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 42.54941463470459,
+        "fps": 712.933
+    },
+    {
+        "N_FOR_VIS": 10000,
+        "VISUALIZE": 1,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 1,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 42.4996280670166,
+        "fps": 591.245
+    },
+    {
+        "N_FOR_VIS": 20000,
+        "VISUALIZE": 1,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 1,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 42.65736150741577,
+        "fps": 536.707
+    },
+    {
+        "N_FOR_VIS": 40000,
+        "VISUALIZE": 1,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 1,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 43.15056252479553,
+        "fps": 745.84
+    },
+    {
+        "N_FOR_VIS": 80000,
+        "VISUALIZE": 1,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 1,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 42.567248821258545,
+        "fps": 888.053
+    },
+    {
+        "N_FOR_VIS": 160000,
+        "VISUALIZE": 1,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 1,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 42.640947103500366,
+        "fps": 863.641
+    },
+    {
+        "N_FOR_VIS": 320000,
+        "VISUALIZE": 1,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 1,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 42.891477823257446,
+        "fps": 658.823
+    },
+    {
+        "N_FOR_VIS": 640000,
+        "VISUALIZE": 1,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 1,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 42.98336863517761,
+        "fps": 353.644
+    },
+    {
+        "N_FOR_VIS": 1280000,
+        "VISUALIZE": 1,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 1,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 42.7063570022583,
+        "fps": 136.755
+    },
+    {
+        "N_FOR_VIS": 2560000,
+        "VISUALIZE": 1,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 1,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 42.812182664871216,
+        "fps": 40.2417
+    },
+    {
+        "N_FOR_VIS": 5120000,
+        "VISUALIZE": 1,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 1,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 43.9535129070282,
+        "fps": 10.6916
+    },
+    {
+        "N_FOR_VIS": 10240000,
+        "VISUALIZE": 1,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 1,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 43.94885492324829,
+        "fps": 2.73641
+    },
+    {
+        "N_FOR_VIS": 20480000,
+        "VISUALIZE": 1,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 1,
+        "CUDA_BLOCK_SIZE": 128,
+        "duration": 45.870015382766724,
+        "fps": 0.686907
+    },
+    {
+        "N_FOR_VIS": 320000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 0,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 8,
+        "duration": 136.1958782672882,
+        "fps": 1.86501
+    },
+    {
+        "N_FOR_VIS": 320000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 0,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 16,
+        "duration": 90.0837516784668,
+        "fps": 3.66536
+    },
+    {
+        "N_FOR_VIS": 320000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 0,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 32,
+        "duration": 79.41441679000854,
+        "fps": 6.51442
+    },
+    {
+        "N_FOR_VIS": 320000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 0,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 64,
+        "duration": 65.50129318237305,
+        "fps": 7.72011
+    },
+    {
+        "N_FOR_VIS": 320000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 0,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 256,
+        "duration": 66.01456427574158,
+        "fps": 7.71945
+    },
+    {
+        "N_FOR_VIS": 320000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 0,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 512,
+        "duration": 65.19048476219177,
+        "fps": 7.88175
+    },
+    {
+        "N_FOR_VIS": 320000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 0,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 1024,
+        "duration": 68.78368377685547,
+        "fps": 6.69409
+    },
+    {
+        "N_FOR_VIS": 320000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 8,
+        "duration": 42.970850229263306,
+        "fps": 160.786
+    },
+    {
+        "N_FOR_VIS": 320000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 16,
+        "duration": 42.7337384223938,
+        "fps": 128.865
+    },
+    {
+        "N_FOR_VIS": 320000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 32,
+        "duration": 42.73615026473999,
+        "fps": 105.204
+    },
+    {
+        "N_FOR_VIS": 320000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 64,
+        "duration": 42.7649986743927,
+        "fps": 106.415
+    },
+    {
+        "N_FOR_VIS": 320000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 256,
+        "duration": 43.420793533325195,
+        "fps": 108.58
+    },
+    {
+        "N_FOR_VIS": 320000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 512,
+        "duration": 42.76414775848389,
+        "fps": 108.646
+    },
+    {
+        "N_FOR_VIS": 320000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 0,
+        "CUDA_BLOCK_SIZE": 1024,
+        "duration": 43.16584300994873,
+        "fps": 108.534
+    },
+    {
+        "N_FOR_VIS": 320000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 1,
+        "CUDA_BLOCK_SIZE": 8,
+        "duration": 42.82587432861328,
+        "fps": 456.312
+    },
+    {
+        "N_FOR_VIS": 320000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 1,
+        "CUDA_BLOCK_SIZE": 16,
+        "duration": 43.6635365486145,
+        "fps": 745.062
+    },
+    {
+        "N_FOR_VIS": 320000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 1,
+        "CUDA_BLOCK_SIZE": 32,
+        "duration": 42.92927360534668,
+        "fps": 1062.52
+    },
+    {
+        "N_FOR_VIS": 320000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 1,
+        "CUDA_BLOCK_SIZE": 64,
+        "duration": 52.27240800857544,
+        "fps": 1179.15
+    },
+    {
+        "N_FOR_VIS": 320000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 1,
+        "CUDA_BLOCK_SIZE": 256,
+        "duration": 43.77426838874817,
+        "fps": 1187.97
+    },
+    {
+        "N_FOR_VIS": 320000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 1,
+        "CUDA_BLOCK_SIZE": 512,
+        "duration": 42.81476378440857,
+        "fps": 1148.7
+    },
+    {
+        "N_FOR_VIS": 320000,
+        "VISUALIZE": 0,
+        "UNIFORM_GRID": 1,
+        "COHERENT_GRID": 1,
+        "CUDA_BLOCK_SIZE": 1024,
+        "duration": 42.76699924468994,
+        "fps": 1105.45
+    }
+]
