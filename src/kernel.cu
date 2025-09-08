@@ -187,11 +187,11 @@ void Boids::initSimulation(int N) {
   cudaMalloc((void**)&dev_particleGridIndices, N * sizeof(int));    // What grid cell is this particle in?
   checkCUDAErrorWithLine("cudaMalloc dev_particleGridIndices failed!");
 
-  thrust::device_ptr<int> dev_thrust_particleArrayIndices(dev_particleArrayIndices);    // Thrust device ptr for dev_particleArrayIndices
-  checkCUDAErrorWithLine("device_ptr init for dev_particeArrayIndices failed!");
+  dev_thrust_particleArrayIndices = thrust::device_pointer_cast(dev_particleArrayIndices);    // Thrust device ptr for dev_particleArrayIndices
+  checkCUDAErrorWithLine("device_ptr cast for dev_particeArrayIndices failed!");
 
-  thrust::device_ptr<int> dev_thrust_particleGridIndices(dev_particleGridIndices);  // Thrust device ptr for dev_particleGridIndices
-  checkCUDAErrorWithLine("device_ptr init for dev_particeGridIndices failed!");
+  dev_thrust_particleGridIndices = thrust::device_pointer_cast(dev_particleGridIndices);  // Thrust device ptr for dev_particleGridIndices
+  checkCUDAErrorWithLine("device_ptr cast for dev_particeGridIndices failed!");
 
   cudaMalloc((void**)&dev_gridCellStartIndices, gridCellCount * sizeof(int));    // What particle index starts grid?
   checkCUDAErrorWithLine("cudaMalloc dev_gridCellStartIndices failed!");
@@ -405,10 +405,10 @@ __global__ void kernIdentifyCellStartEnd(int N, int *particleGridIndices,
         return;
     }
     int curr_cell_index = particleGridIndices[index];
-    if ((index > 0 && (particleGridIndices[index] - 1) != curr_cell_index) || index == 0) {
+    if ((index > 0 && (particleGridIndices[index - 1]) != curr_cell_index) || index == 0) {
         gridCellStartIndices[curr_cell_index] = index;
     }
-    if ((index < N - 1 && (particleGridIndices[index] + 1) != curr_cell_index) || index == N - 1) {
+    if ((index < N - 1 && (particleGridIndices[index + 1]) != curr_cell_index) || index == N - 1) {
         gridCellEndIndices[curr_cell_index] = index;
     }
 }
@@ -422,7 +422,7 @@ __device__ int posToCellIdx(glm::vec3 thisPos, int gridResolution, glm::vec3 gri
 
 __global__ void kernUpdateVelNeighborSearchScattered(
   int N, int gridResolution, glm::vec3 gridMin,
-  float inverseCellWidth, float cellWidth,
+  float inverseCellWidth,
   int *gridCellStartIndices, int *gridCellEndIndices,
   int *particleArrayIndices,
   glm::vec3 *pos, glm::vec3 *vel1, glm::vec3 *vel2) {
@@ -441,7 +441,7 @@ __global__ void kernUpdateVelNeighborSearchScattered(
     int boidIndex = particleArrayIndices[index];    // Actual index of pos and velocity
     glm::vec3 thisPos = pos[boidIndex];
     glm::vec3 thisVel = vel1[boidIndex];
-    int thisCellIndex = posToCellIdx(thisPos, gridResolution, gridMin, inverseCellWidth);
+    //int thisCellIndex = posToCellIdx(thisPos, gridResolution, gridMin, inverseCellWidth);
     glm::ivec3 thisCellCoords = glm::floor((thisPos - gridMin) * inverseCellWidth);
 
     int cx = thisCellCoords.x;
@@ -462,7 +462,7 @@ __global__ void kernUpdateVelNeighborSearchScattered(
     int offset2 = (int)ceilf(rule2Distance * inverseCellWidth);
     int offset3 = (int)ceilf(rule3Distance * inverseCellWidth);
 
-    int offsetMax = max(offset1, max(offset2, offset3));
+    int offsetMax = imax(offset1, imax(offset2, offset3));
 
     for (int dz = -offsetMax; dz <= offsetMax; ++dz) {
         int nz = cz + dz;
@@ -597,7 +597,7 @@ void Boids::stepSimulationScatteredGrid(float dt) {
     checkCUDAErrorWithLine("kernIdentifyCellStartEnd failed!");
     cudaDeviceSynchronize();
 
-    kernUpdateVelNeighborSearchScattered<<<fullBlocksPerGrid, blockSize>>> (N, gridSideCount, gridMinimum, gridInverseCellWidth, gridCellWidth,
+    kernUpdateVelNeighborSearchScattered<<<fullBlocksPerGrid, blockSize>>> (N, gridSideCount, gridMinimum, gridInverseCellWidth,
         dev_gridCellStartIndices, dev_gridCellEndIndices, dev_particleArrayIndices, dev_pos, readVel, writeVel);
     checkCUDAErrorWithLine("kernUpdateVelNeighborSearchScattered failed!");
     cudaDeviceSynchronize();
