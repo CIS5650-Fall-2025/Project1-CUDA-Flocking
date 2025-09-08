@@ -18,6 +18,10 @@
                     "name": "WAYLAND_DISPLAY",
                     "value": "''"
                 },
+                {
+                    "name": "__GL_SYNC_TO_VBLANK",
+                    "value": "0"
+                }
             ]
         }
     ]
