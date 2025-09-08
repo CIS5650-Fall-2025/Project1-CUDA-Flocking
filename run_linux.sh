@@ -22,4 +22,4 @@ while true; do
     esac
 done
 
-XDG_SESSION_TYPE=x11 WAYLAND_DISPLAY="" $SCRIPT_DIR/build/bin/cis5650_boids
+__GL_SYNC_TO_VBLANK=0 XDG_SESSION_TYPE=x11 WAYLAND_DISPLAY="" $SCRIPT_DIR/build/bin/cis5650_boids
