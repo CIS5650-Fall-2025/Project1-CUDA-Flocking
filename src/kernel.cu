@@ -569,34 +569,27 @@ __global__ void kernUpdateVelNeighborSearchScattered(
     int neighbors1 = 0;
     int neighbors3 = 0;
 
-    float fx = (selfPos.x - gridMin.x) / cellWidth - floor((selfPos.x - gridMin.x) / cellWidth);
-    int stepX = 0;
-    if ((fx * cellWidth) <= cellWidth/2) stepX = -1;
-    else if ((cellWidth - (fx * cellWidth)) < cellWidth/2) stepX = +1;
+    float R = fmaxf(fmaxf(rule1Distance, rule2Distance), rule3Distance);
 
-    float fy = (selfPos.y - gridMin.y) / cellWidth - floor((selfPos.y - gridMin.y) / cellWidth);
-    int stepY = 0;
-    if ((fy * cellWidth) <= cellWidth / 2) stepY = -1;
-    else if ((cellWidth - (fy * cellWidth)) < cellWidth / 2) stepY = +1;
+    int minX = (int)floorf(((selfPos.x - R) - gridMin.x) * inverseCellWidth);
+    int maxX = (int)floorf(((selfPos.x + R) - gridMin.x) * inverseCellWidth);
+    int minY = (int)floorf(((selfPos.y - R) - gridMin.y) * inverseCellWidth);
+    int maxY = (int)floorf(((selfPos.y + R) - gridMin.y) * inverseCellWidth);
+    int minZ = (int)floorf(((selfPos.z - R) - gridMin.z) * inverseCellWidth);
+    int maxZ = (int)floorf(((selfPos.z + R) - gridMin.z) * inverseCellWidth);
 
-    float fz = (selfPos.z - gridMin.z) / cellWidth - floor((selfPos.z - gridMin.z) / cellWidth);
-    int stepZ = 0;
-    if ((fz * cellWidth) <= cellWidth / 2) stepZ = -1;
-    else if ((cellWidth - (fz * cellWidth)) < cellWidth / 2) stepZ = +1;
-
-    for (int dx : {0, stepX != 0 ? stepX : 0}) {
-        for (int dy : {0, stepY != 0 ? stepY : 0}) {
-            for (int dz : {0, stepZ != 0 ? stepZ : 0}) {
-                int nx, ny, nz;
+    for (int gz = minZ; gz <= maxZ; ++gz) {
+        for (int gy = minY; gy <= maxY; ++gy) {
+            for (int gx = minX; gx <= maxX; ++gx) {
+                int nx = gx;
+                int ny = gy;
+                int nz = gz;
                 if (periodicDistance == true) {
-                    nx = (ix + dx + gridResolution) % gridResolution;
-                    ny = (iy + dy + gridResolution) % gridResolution;
-                    nz = (iz + dz + gridResolution) % gridResolution;
+                    nx = (nx % gridResolution + gridResolution) % gridResolution;
+                    ny = (ny % gridResolution + gridResolution) % gridResolution;
+                    nz = (nz % gridResolution + gridResolution) % gridResolution;
                 }
                 else {
-                    nx = ix + dx;
-                    ny = iy + dy;
-                    nz = iz + dz;
                     if (nx < 0 || ny < 0 || nz < 0 ||
                         nx >= gridResolution || ny >= gridResolution || nz >= gridResolution) {
                         continue;
@@ -723,36 +716,28 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
     int neighbors1 = 0;
     int neighbors3 = 0;
 
-    float fx = (selfPos.x - gridMin.x) / cellWidth - floor((selfPos.x - gridMin.x) / cellWidth);
-    int stepX = 0;
-    if ((fx * cellWidth) <= cellWidth / 2) stepX = -1;
-    else if ((cellWidth - (fx * cellWidth)) < cellWidth / 2) stepX = +1;
+    float R = fmaxf(fmaxf(rule1Distance, rule2Distance), rule3Distance);
 
-    float fy = (selfPos.y - gridMin.y) / cellWidth - floor((selfPos.y - gridMin.y) / cellWidth);
-    int stepY = 0;
-    if ((fy * cellWidth) <= cellWidth / 2) stepY = -1;
-    else if ((cellWidth - (fy * cellWidth)) < cellWidth / 2) stepY = +1;
+    int minX = (int)floorf(((selfPos.x - R) - gridMin.x) * inverseCellWidth);
+    int maxX = (int)floorf(((selfPos.x + R) - gridMin.x) * inverseCellWidth);
+    int minY = (int)floorf(((selfPos.y - R) - gridMin.y) * inverseCellWidth);
+    int maxY = (int)floorf(((selfPos.y + R) - gridMin.y) * inverseCellWidth);
+    int minZ = (int)floorf(((selfPos.z - R) - gridMin.z) * inverseCellWidth);
+    int maxZ = (int)floorf(((selfPos.z + R) - gridMin.z) * inverseCellWidth);
 
-    float fz = (selfPos.z - gridMin.z) / cellWidth - floor((selfPos.z - gridMin.z) / cellWidth);
-    int stepZ = 0;
-    if ((fz * cellWidth) <= cellWidth / 2) stepZ = -1;
-    else if ((cellWidth - (fz * cellWidth)) < cellWidth / 2) stepZ = +1;
-
-    for (int dx : {0, stepX != 0 ? stepX : 0}) {
-        for (int dy : {0, stepY != 0 ? stepY : 0}) {
-            for (int dz : {0, stepZ != 0 ? stepZ : 0}) {
-                int nx, ny, nz;
+    for (int gz = minZ; gz <= maxZ; ++gz) {
+        for (int gy = minY; gy <= maxY; ++gy) {
+            for (int gx = minX; gx <= maxX; ++gx) {
+                int nx = gx;
+                int ny = gy;
+                int nz = gz;
                 if (periodicDistance == true) {
-                    nx = (ix + dx + gridResolution) % gridResolution;
-                    ny = (iy + dy + gridResolution) % gridResolution;
-                    nz = (iz + dz + gridResolution) % gridResolution;
+                    nx = (nx % gridResolution + gridResolution) % gridResolution;
+                    ny = (ny % gridResolution + gridResolution) % gridResolution;
+                    nz = (nz % gridResolution + gridResolution) % gridResolution;
                 }
                 else {
-                    nx = ix + dx;
-                    ny = iy + dy;
-                    nz = iz + dz;
-                    if (nx < 0 || ny < 0 || nz < 0 ||
-                        nx >= gridResolution || ny >= gridResolution || nz >= gridResolution) {
+                    if (nx < 0 || ny < 0 || nz < 0 || nx >= gridResolution || ny >= gridResolution || nz >= gridResolution) {
                         continue;
                     }
                 }
