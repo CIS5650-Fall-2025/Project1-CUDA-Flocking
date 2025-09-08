@@ -28,7 +28,7 @@ For testing, I developed a custom PerfTimer class to measure the performance of 
 
 ### Performance with different number of boids 
 
-| # of boids |FPS(Brute force) | FPS(Scattered Grid) | FPS(Coherent Grid) |
+| # of boids |FPS(Naive) | FPS(Scattered Grid) | FPS(Coherent Grid) |
 | :--- | :--- | :--- | :--- |
 | 1000 | 51.3 | 292.9 | 291 |
 | 5000 | 6.3 | 116.6 | 120.4 |
@@ -40,6 +40,35 @@ For testing, I developed a custom PerfTimer class to measure the performance of 
 ![](images/graph-1.png)
 
 ### For each implementation, how does changing the number of boids affect performance? Why do you think this is?
-Brute force: The brute force implementation uses and O(N^2) method, in which every boid checks every other boid in the simulation to apply the flocking rules. So thus, as N grows the number of comparisons increases quadratically. This can be 
+The Naive implementation uses and O(N^2) method, in which every boid checks every other boid in the simulation to apply the flocking rules. So thus, as N grows the number of comparisons increases quadratically. This can be 
 seen by the results, in which the data shows sharp and non-linear drops in performance as the number of boids increase. In particular, the jump from 1k -> 5k boids causes the FPS to plummet from 51.3 to 6.3.
 Scattered and Coherent grid implementations show a much more gradual decrease in performance compared to brute force. This is because both approximates to an O(N) complexity because in the simulation, it divides the space into grids, thus each grid needs to only check its neighboring grid. Which drastically reduces its time complexity. Scattered and Coherent grids differ by the fact that Coherent grids have memory that are reordered, which means that boids that are close in the space are also closer in memory. This is why you can see in the grid, that the Coherent Grid performs better than Scattered grids. 
+
+### Performance with different block sizes
+
+
+| Block Size | FPS(Naive) | FPS(Scattered Grid) | FPS(Coherent Grid) |
+| :--- | :--- | :--- | :--- |
+| 32 | 6.3 | 118.4 | 121.3 |
+| 64 | 6.4 | 118.3 | 120.9 |
+| 128 | 6.2 | 118.6 | 119.5 |
+| 256 | 5.4 | 116.6 | 118.8 |
+| 512 | 5 | 113.1 | 115.9 |
+| 1024 | 3.8 | 103.6 | 105.9 |
+
+![](images/graph-2.png)
+
+### For each implementation, how does changing the block count and block size affect performance? Why do you think this is?
+
+There is an insignificant decrease in performance as block sizes increases, this is as a consequence of lower occupancy with increased block sizes and also resource strains. 
+
+
+### For the coherent uniform grid: did you experience any performance improvements with the more coherent uniform grid? Was this the outcome you expected? Why or why not?
+
+Yes although rather minor, you can see this through the data and it was expected due to the improvement in data locality by reordering boid data in memory to match their proximity within the simulation space.
+
+
+![](images/graph-3.png)
+
+### Did changing cell width and checking 27 vs 8 neighboring cells affect performance? Why or why not? Be careful: it is insufficient (and possibly incorrect) to say that 27-cell is slower simply because there are more cells to check!
+Despite being more cells to check, the 27 neighboring cells outperforms the 8 neighboring cells. This is because, although there are more cells to check, each cell contains smaller amounts of boids which means that there are fewer boids to check.
