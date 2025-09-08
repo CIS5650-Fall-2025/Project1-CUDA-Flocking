@@ -1,5 +1,5 @@
 Visualize,Uniform Grid,Coherent Grid,Boid Count,Block Size,Grid Looping Optimization,Grid Width Scale,Average FPS
-0,0.1,0.2,5000,128,0.3,2,1103.4084
+0,0,0,5000,128,0,2,1103.4084
 0,0,0,10000,128,0,2,619.0344
 0,0,0,25000,128,0,2,161.4444
 0,0,0,50000,128,0,2,48.37284
