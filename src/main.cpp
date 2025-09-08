@@ -23,8 +23,12 @@
 
 // LOOK-2.1 LOOK-2.3 - toggles for UNIFORM_GRID and COHERENT_GRID
 #define VISUALIZE 1
-#define UNIFORM_GRID 0
-#define COHERENT_GRID 0
+#define UNIFORM_GRID 1
+#define COHERENT_GRID 1
+
+#define IS_PROFILING 1
+#define USE_NSIGHT_COMPUTE 0
+#define USE_27_CHECK 1
 
 // LOOK-1.2 - change this to adjust particle count in the simulation
 const int N_FOR_VIS = 5000;
@@ -229,11 +233,32 @@ void initShaders(GLuint * program) {
     Boids::unitTest(); // LOOK-1.2 We run some basic example code to make sure
                        // your CUDA development setup is ready to go.
 
-    while (!glfwWindowShouldClose(window)) {
-      glfwPollEvents();
+#if IS_PROFILING
+    int numFrames = 0;
+    double accumulatedFPS = 0.0f;
+    double framesLogged = 0.0f;
+    double initTime = glfwGetTime();
+    double currTime = initTime;
+#endif
 
+#if USE_NSIGHT_COMPUTE
+    while (!glfwWindowShouldClose(window) && numFrames < 5) {
+#else
+#if IS_PROFILING
+    while (!glfwWindowShouldClose(window) && currTime - initTime < 10.0f) {
+#else
+    while(!glfwWindowShouldClose(window)) {
+#endif // IS_PROFILING
+#endif // !USE_NSIGHT_COMPUTE
+      glfwPollEvents();
       frame++;
+
       double time = glfwGetTime();
+
+#if IS_PROFILING
+      numFrames++;
+      currTime = time;
+#endif
 
       if (time - timebase > 1.0) {
         fps = frame / (time - timebase);
@@ -265,6 +290,11 @@ void initShaders(GLuint * program) {
       glfwSwapBuffers(window);
       #endif
     }
+
+#if !USE_NSIGHT_COMPUTE && IS_PROFILING
+    std::cout << "average FPS: " << numFrames / 10.0f << std::endl;
+#endif
+
     glfwDestroyWindow(window);
     glfwTerminate();
   }
