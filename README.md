@@ -1,10 +1,10 @@
-**University of Pennsylvania, CIS 5650: GPU Programming and Architecture,
-Project 1 - Flocking**
+![Untitled video - Made with Clipchamp (4)](https://github.com/user-attachments/assets/ef38b626-2857-4cae-83aa-4d56ad9089a1)
 
-* (TODO) YOUR NAME HERE
-  * (TODO) [LinkedIn](), [personal website](), [twitter](), etc.
-* Tested on: (TODO) Windows 22, i7-2222 @ 2.22GHz 22GB, GTX 222 222MB (Moore 2222 Lab)
+**Boids CUDA Implementation**
 
+*  Eli Asimow
+* [LinkedIn](https://www.linkedin.com/in/eli-asimow/), [personal website](https://easimow.com)
+* Tested on: Windows 11, AMD Ryzen 7 7435HS @ 2.08GHz 16GB, Nvidia GeForce RTX 4060 GPU
 ### (TODO: Your README)
 
 Include screenshots, analysis, etc. (Remember, this is public, so don't put
