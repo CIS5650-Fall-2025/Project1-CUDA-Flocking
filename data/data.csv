@@ -1,3 +1,4 @@
+// Note average FPS was incorrectly divided by 12 instead of 10. Processed data fixes this mistake and formats the data better for a csv
 Visualize: 0, Uniform Grid: 0, Coherent_Grid: 0, Boid Count:5000, Block Size: 128, Grid Looping Optimization: 0, Grid Width Scale: 2, Average FPS:919.507, Data: 1109.8, 1104.86, 1098.96, 1098.88, 1102.65, 1099.17, 1115.87, 1094.06, 1103, 1106.84, 
 Visualize: 0, Uniform Grid: 0, Coherent_Grid: 0, Boid Count:10000, Block Size: 128, Grid Looping Optimization: 0, Grid Width Scale: 2, Average FPS:515.862, Data: 623.93, 614.013, 616.236, 619.358, 621.802, 617.958, 618.582, 619.277, 619.135, 620.055, 
 Visualize: 0, Uniform Grid: 0, Coherent_Grid: 0, Boid Count:25000, Block Size: 128, Grid Looping Optimization: 0, Grid Width Scale: 2, Average FPS:134.537, Data: 148.118, 152.355, 154.78, 159.057, 164.832, 162.381, 164.55, 168.616, 169.906, 169.85, 
