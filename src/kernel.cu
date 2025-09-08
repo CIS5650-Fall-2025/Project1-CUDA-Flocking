@@ -242,10 +242,64 @@ void Boids::copyBoidsToVBO(float *vbodptr_positions, float *vbodptr_velocities) 
 * in the `pos` and `vel` arrays.
 */
 __device__ glm::vec3 computeVelocityChange(int N, int iSelf, const glm::vec3 *pos, const glm::vec3 *vel) {
-  // Rule 1: boids fly towards their local perceived center of mass, which excludes themselves
-  // Rule 2: boids try to stay a distance d away from each other
-  // Rule 3: boids try to match the speed of surrounding boids
-  return glm::vec3(0.0f, 0.0f, 0.0f);
+    ///////// parameters
+    glm::vec3 perceived_center = glm::vec3(0.f, 0.f, 0.f);
+    glm::vec3 perceived_velocity = glm::vec3(0.f, 0.f, 0.f);
+
+    // counter for number of neighbors 
+    int numNeighbors1 = 0;
+    int numNeighbors3 = 0;
+
+    // position of this boid
+    glm::vec3 selfPos = pos[iSelf];
+
+    glm::vec3 c = glm::vec3(0.f, 0.f, 0.f);
+
+    ///////// loop through boids
+    for (int bIdx = 0; bIdx < N; bIdx++) {
+        if (bIdx != iSelf) {
+            // distance from boid iSelf to the current boid we've looped to
+            glm::vec3 boidPos = pos[bIdx];
+            float dist = glm::length(selfPos - boidPos);
+
+            //////// Rule 1: boids fly towards their local perceived center of mass, which excludes themselves
+            if (dist < rule1Distance) {
+                perceived_center += boidPos;
+                numNeighbors1++;
+            }
+
+            ///////// Rule 2: boids try to stay a distance d away from each other
+            if (dist < rule2Distance) {
+                c -= (boidPos - selfPos);
+            }
+
+            //////// Rule 3: boids try to match the speed of surrounding boids
+            if (dist < rule3Distance) {
+                perceived_velocity += vel[bIdx];
+                numNeighbors3++;
+            }
+        }
+    }
+
+    //////// compute result
+    glm::vec3 resultVel = glm::vec3(0.f, 0.f, 0.f);
+
+    // Rule 1
+    if (numNeighbors1 > 0) {
+        perceived_center /= numNeighbors1;
+        resultVel += (perceived_center - selfPos) * rule1Scale;
+    }
+    
+    // Rule 2
+    resultVel += c * rule2Scale;
+
+    // Rule 3
+    if (numNeighbors3 > 0) {
+        perceived_velocity /= numNeighbors3;
+        resultVel += perceived_velocity * rule3Scale;
+    }
+
+    return resultVel;
 }
 
 /**
@@ -262,7 +316,7 @@ __global__ void kernUpdateVelocityBruteForce(int N, glm::vec3 *pos,
 
     // Compute a new velocity based on pos and vel1
     glm::vec3 velChange = computeVelocityChange(N, index, pos, vel1);
-    glm::vec3 thisVel = vel1[index] * velChange;
+    glm::vec3 thisVel = vel1[index] + velChange;
   
     // Clamp the speed
     float thisSpeed = glm::length(thisVel);
@@ -384,6 +438,8 @@ void Boids::stepSimulationNaive(float dt) {
     
     // TODO-1.2 ping-pong the velocity buffers
     std::swap(dev_vel1, dev_vel2);
+
+    cudaDeviceSynchronize();
 }
 
 void Boids::stepSimulationScatteredGrid(float dt) {
