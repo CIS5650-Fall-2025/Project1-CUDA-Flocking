@@ -1,5 +1,7 @@
 #pragma once
 
+
+
 namespace Boids {
     void initSimulation(int N);
     void stepSimulationNaive(float dt);
@@ -9,4 +11,6 @@ namespace Boids {
 
     void endSimulation();
     void unitTest();
+
+    void printStats(int N);
 }
