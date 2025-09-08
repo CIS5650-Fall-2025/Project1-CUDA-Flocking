@@ -20,7 +20,7 @@ Project 1 - Flocking**
 ![](images/boids-opt-100000.gif)
 
 
-NB: Average FPS calculated using harmonic mean (1000/mean(t) - where t = ms)
+NB: Average FPS calculated using harmonic mean (1000/mean(t) - where t = ms), simulation time = 10 seconds
 #### Figure 1: Performance with different # of boids (Grid cell width == 2*MaxRuleDistance)
 
 | # of boids | Avg FPS(Brute force) | Avg FPS(Scattered Grid) | Avg FPS(Coherent Grid) | Avg FPS(Coherent Grid with grid looping optimization) |
