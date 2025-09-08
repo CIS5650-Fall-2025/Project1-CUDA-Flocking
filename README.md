@@ -17,9 +17,11 @@ As the boid count increases, performance deteriorates across all three implement
 
 It’s important to note that both scattered and naive had moments of superiority as well. After metrics analysis, we can conclude that the new sort algorithms and memory overhead are the primary factors here. At exceedingly small boid counts, running additional kernels to sort our boid indices has a greater performance cost than the performance saved by scattered and coherent. So, at 1,000 boids, naive can actually be the best option. Likewise, at 10,000, although the grid cell sort of coherent and scattered make them superior to naive, coherent’s memory adjacency is still relatively less useful than the sort algorithms and additional buffer that scattered can skip. 
 
- <img width="600" height="371" alt="Naive, Scattered and Coherent Performance (FPS)" src="https://github.com/user-attachments/assets/d67a684d-45a2-4e83-9073-c3951e13e41a" />
+<img width="600" height="371" alt="Naive, Scattered and Coherent Performance (FPS)" src="https://github.com/user-attachments/assets/d67a684d-45a2-4e83-9073-c3951e13e41a" />
+<img width="600" height="371" alt="Naive, Scattered and Coherent Block Size Performance (FPS)" src="https://github.com/user-attachments/assets/9d8394fe-7507-4087-83a6-2c628255847c" />
 
-I was surprised to see negligible effects on performance when modifying block size. Perhaps the block size ultimately doesn’t matter outside of a hard ceiling and floor. 
+I was surprised to see negligible effects on performance when modifying block size. Perhaps the block size ultimately doesn’t matter outside of a hard ceiling and floor. Because of the lack of general I/O thread freezes or global memory overhead, most threads will be executing continually throughout the kernel. Because of this, perhaps it's irrelevant which block they're a part of. 
+
 More expected is the difference between coherent and scattered grid performance. It makes sense that, as the number of boids in neighboring cells increases, the importance of memory adjacency for the speed of accessing them increases accordingly.
 
 Lastly, my favorite optimization was realizing that 27 neighboring grid cells actually outperforms 8 neighbor cells! Grid cell size causes this counterintuitive result. In order to have only 8 cells checked, we must have a grid cell length of 2 * the maximum distance threshold. This results in a total neighbor check side length of 2 * 2d = 4d. With 27 neighboring cells, however, we can have each grid cell sized at the smaller 1 * maximum distance threshold. This results in a side length of just 3 * 1d = 3d, smaller than in the 8 cells implementation. Because 27’s radius check is ultimately smaller, that means more boids are filtered out of this step and the kernel can compute the velocity step relatively quicker. 
@@ -34,7 +36,7 @@ I really fell in love with adding new rules to the system and experimented quite
 2) A universal gravity effect that pulls the particles down
 3) A sinusoidal time gravity affected, modulated by particle distance, drawing particles towards the grid center and then dropping them down.
 
-I'll leave you with some other results I found while messing around.
+I'll leave you with some other results I found while messing around. Thank you!
 
 ![Untitled video - Made with Clipchamp (7)](https://github.com/user-attachments/assets/866125de-dc03-43d8-9590-d182f2cb3b22)
 ![Untitled video - Made with Clipchamp (6)](https://github.com/user-attachments/assets/1cc25ca3-bd39-40ab-98da-bcb465445baf)
