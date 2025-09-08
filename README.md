@@ -1,6 +1,17 @@
 # CUDA Flocking Simulation
+* **Name:** Vismay Churiwala  
+  * [LinkedIn](https://www.linkedin.com/in/vismay-churiwala-8b0073190/) | [Website](https://vismaychuriwala.com/)
+* **System Specs (Personal Machine):**  
+  * OS: Windows 11  
+  * CPU: AMD Ryzen 7 5800H with Radeon Graphics (8C/16T, 3.2GHz base)  
+  * RAM: 32GB DDR4  
+  * GPU: NVIDIA GeForce RTX 3060 Laptop GPU (6GB GDDR6)  
+  * CUDA Toolkit: 13.0  
+  * Driver Version: 581.15  
 
+---
 This is a CUDA-powered take on Reynolds’ Boids. I compare a few implementation strategies and look at how much each one helps on real hardware. I start with the brute force approach where every boid checks every other boid, then move on to using grids to make efficient use of CUDA parallelization, and finally I add another optimization where the boid positions and velocities are stored in a coherent array where particles in the same grid are contiguous in memory.
+
 
 ## Coherent Arrays Implementation
 
@@ -17,7 +28,7 @@ This is a CUDA-powered take on Reynolds’ Boids. I compare a few implementation
 <!-- ![Uniform Grid Boids](images/uniform_grid.png) -->
 ![Uniform Grid Boids Animation](gifs/uniform_grid_gif.gif)
 
-As you can see, the coherent arrays version performs best, followed by the uniform grid, and then brute force. Below is a deeper dive with framerate, frame time, and kernel step timing.
+As you can see, the coherent arrays version performs best, followed by the uniform grid, and then brute force. Below is a deeper dive with framerate, frame time, and kernel step timing. Note: All testing is done with visualization off.
 
 ## Performance Analysis
 
