@@ -277,10 +277,11 @@ __device__ glm::vec3 computeVelocityChange(int N, int iSelf, const glm::vec3 *po
     if (iSelf != i)
     {
       const glm::vec3 currIPos = pos[i];
+      float dist2 = distance2(iSelfPos, currIPos);
       // create mask values to eliminate branching
-      float mask1 = distance2(iSelfPos, currIPos) < rule1Distance * rule1Distance ? 1.f : 0.f;
-      float mask3 = distance2(iSelfPos, currIPos) < rule3Distance * rule3Distance ? 1.f : 0.f;
-      float mask2 = distance2(iSelfPos, currIPos) < rule2Distance * rule2Distance ? 1.f : 0.f;
+      float mask1 = dist2 < rule1Distance * rule1Distance ? 1.f : 0.f;
+      float mask2 = dist2 < rule2Distance * rule2Distance ? 1.f : 0.f;
+      float mask3 = dist2 < rule3Distance * rule3Distance ? 1.f : 0.f;
       
       cohesion += mask1 * currIPos;
       separation -= mask2 * (currIPos - iSelfPos);
@@ -326,7 +327,7 @@ __global__ void kernUpdateVelocityBruteForce(int N, glm::vec3 *pos,
   float speed2 = glm::dot(newVel, newVel);
   newVel = speed2 > maxSpeed * maxSpeed ? newVel * rsqrtf(speed2) * maxSpeed : newVel;
 
-  vel2[N] = newVel;
+  vel2[iSelf] = newVel;
 }
 
 /**
