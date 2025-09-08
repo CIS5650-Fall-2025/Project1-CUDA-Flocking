@@ -482,6 +482,35 @@ __global__ void kernUpdateVelNeighborSearchScattered(
 	glm::vec3 velSelf = vel1[index];
     glm::ivec3 gridIndex3D = getGridIndex3DFromPos(pos[index], gridMin, inverseCellWidth);
 
+    float cx = (posSelf.x - gridMin.x) * inverseCellWidth;
+    float cy = (posSelf.y - gridMin.y) * inverseCellWidth;
+    float cz = (posSelf.z - gridMin.z) * inverseCellWidth;
+
+    // Fractional position within the cell
+    float fx = cx - gridIndex3D.x;
+    float fy = cy - gridIndex3D.y;
+    float fz = cz - gridIndex3D.z;
+
+    float maxdistOfRules = fmaxf(fmaxf(rule1Distance, rule2Distance), rule3Distance);
+    float maxR = maxdistOfRules * inverseCellWidth;
+
+	// How many cells away do we have to search in each direction?
+    int rx_neg = (int)ceilf(fmaxf(0.0f, maxR - fx));
+    int rx_pos = (int)ceilf(fmaxf(0.0f, maxR - (1.0f - fx)));
+    int ry_neg = (int)ceilf(fmaxf(0.0f, maxR - fy));
+    int ry_pos = (int)ceilf(fmaxf(0.0f, maxR - (1.0f - fy)));
+    int rz_neg = (int)ceilf(fmaxf(0.0f, maxR - fz));
+    int rz_pos = (int)ceilf(fmaxf(0.0f, maxR - (1.0f - fz)));
+
+
+    int startX = gridIndex3D.x - rx_neg; if (startX < 0) startX = 0;
+    int endX = gridIndex3D.x + rx_pos; if (endX >= gridResolution) endX = gridResolution - 1;
+
+    int startY = gridIndex3D.y - ry_neg; if (startY < 0) startY = 0;
+    int endY = gridIndex3D.y + ry_pos; if (endY >= gridResolution) endY = gridResolution - 1;
+
+    int startZ = gridIndex3D.z - rz_neg; if (startZ < 0) startZ = 0;
+    int endZ = gridIndex3D.z + rz_pos; if (endZ >= gridResolution) endZ = gridResolution - 1;
 
     glm::vec3 perceivedCenter(0.0f, 0.0f, 0.0f);
     glm::vec3 c(0.0f, 0.0f, 0.0f);
@@ -490,25 +519,18 @@ __global__ void kernUpdateVelNeighborSearchScattered(
     unsigned int neighbourCountAlignment = 0;
 
   // - Identify which cells may contain neighbors. This isn't always 8.
-    for (int dz = -1; dz <= 1; ++dz) {
-        for (int dy = -1; dy <= 1; ++dy) {
-            for (int dx = -1; dx <= 1; ++dx) {
-                glm::ivec3 neighbourGridIndex3D = gridIndex3D + glm::ivec3(dx, dy, dz);
+    for (int nz = startZ; nz <= endZ; ++nz) {
+        for (int ny = startY; ny <= endY; ++ny) {
+            for (int nx = startX; nx <= endX; ++nx) {
 
-                if (neighbourGridIndex3D.x < 0 || neighbourGridIndex3D.x >= gridResolution ||
-                    neighbourGridIndex3D.y < 0 || neighbourGridIndex3D.y >= gridResolution ||
-                    neighbourGridIndex3D.z < 0 || neighbourGridIndex3D.z >= gridResolution) {
-                    continue;
-                }
+                int cellIndex = nx + ny * gridResolution + nz * gridResolution * gridResolution;
+                int start = gridCellStartIndices[cellIndex];
 
-				int neighbourGridIndex1D = gridIndex3Dto1D(neighbourGridIndex3D.x, neighbourGridIndex3D.y, neighbourGridIndex3D.z, gridResolution);
-                // - For each cell, read the start/end indices in the boid pointer array.
-                int start = gridCellStartIndices[neighbourGridIndex1D];
-                int end = gridCellEndIndices[neighbourGridIndex1D];
-
+                // Skip empty cells
                 if (start == -1) {
                     continue;
                 }
+                int end = gridCellEndIndices[cellIndex];
 
                 for (int i = start; i <= end; ++i) {
                     // Get the actual index of the potential neighbor boid.
