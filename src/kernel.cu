@@ -47,7 +47,7 @@ void checkCUDAError(const char *msg, int line = -1) {
 *****************/
 
 /*! Block size used for CUDA kernel launch. */
-#define blockSize 128
+#define blockSize 64
 
 // LOOK-1.2 Parameters for the boids algorithm.
 // These worked well in our reference implementation.
@@ -95,6 +95,8 @@ int *dev_gridCellEndIndices;   // to this cell?
 
 // TODO-2.3 - consider what additional buffers you might need to reshuffle
 // the position and velocity data to be coherent within cells.
+glm::vec3* dev_coherent_pos;
+glm::vec3* dev_coherent_vel;
 
 // LOOK-2.1 - Grid parameters based on simulation parameters.
 // These are automatically computed for you in Boids::initSimulation
@@ -179,6 +181,30 @@ void Boids::initSimulation(int N) {
   gridMinimum.z -= halfGridWidth;
 
   // TODO-2.1 TODO-2.3 - Allocate additional buffers here.
+
+  // buffer containing a pointer for each boid to its data in dev_pos and dev_vel1 and dev_vel2
+  cudaMalloc((void**)&dev_particleArrayIndices, N * sizeof(int));
+  checkCUDAErrorWithLine("cudaMalloc dev_particleArrayIndices failed!");
+
+  // buffer containing the grid index of each boid
+  cudaMalloc((void**)&dev_particleGridIndices, N * sizeof(int));
+  checkCUDAErrorWithLine("cudaMalloc dev_particleGridIndices failed!");
+
+  // buffer containing a pointer for each cell to the beginning of its data in dev_particleArrayIndices
+  cudaMalloc((void**)&dev_gridCellStartIndices, gridCellCount * sizeof(int));
+  checkCUDAErrorWithLine("cudaMalloc dev_gridCellStartIndices failed!");
+
+  // buffer containing a pointer for each cell to the end of its data in dev_particleArrayIndices
+  cudaMalloc((void**)&dev_gridCellEndIndices, gridCellCount * sizeof(int));
+  checkCUDAErrorWithLine("cudaMalloc dev_gridCellEndIndices failed!");
+
+  // for 2.3 - additional position/velocity vectors
+  cudaMalloc((void**)&dev_coherent_pos, N * sizeof(glm::vec3));
+  checkCUDAErrorWithLine("cudaMalloc dev_coherent_pos failed!");
+
+  cudaMalloc((void**)&dev_coherent_vel, N * sizeof(glm::vec3));
+  checkCUDAErrorWithLine("cudaMalloc dev_coherent_vel1 failed!");
+
   cudaDeviceSynchronize();
 }
 
@@ -233,6 +259,91 @@ void Boids::copyBoidsToVBO(float *vbodptr_positions, float *vbodptr_velocities) 
 * stepSimulation *
 ******************/
 
+__device__ float clamp(float f, float min, float max) {
+  if (f < min) {
+    return min;
+  }
+  else if (f > max) {
+    return max;
+  }
+  else {
+    return f;
+  }
+}
+
+__device__ glm::vec3 rule1(int N, int iSelf, const glm::vec3 * pos) {
+  glm::vec3 perceived_center;
+  glm::vec3 self_position = pos[iSelf];
+  float neighbors = 0.0f;
+
+  for (int i = 0; i < N; i++) {
+    if (i == iSelf) {
+      continue;
+    }
+
+    glm::vec3 boid_position = pos[i];
+
+    if (glm::distance(boid_position, self_position) < rule1Distance) {
+      perceived_center += boid_position;
+      neighbors++;
+    }
+  }
+
+  if (neighbors == 0) {
+    return glm::vec3(0);
+  }
+
+  perceived_center /= neighbors;
+  
+  return (perceived_center - self_position) * rule1Scale;
+}
+
+__device__ glm::vec3 rule2(int N, int iSelf, const glm::vec3* pos) {
+  glm::vec3 c;
+  glm::vec3 self_position = pos[iSelf];
+
+  for (int i = 0; i < N; i++) {
+    if (i == iSelf) {
+      continue;
+    }
+
+    glm::vec3 boid_position = pos[i];
+
+    if (glm::distance(boid_position, self_position) < rule2Distance) {
+      c -= (boid_position - self_position);
+    }
+  }
+
+  return c * rule2Scale;
+}
+
+
+__device__ glm::vec3 rule3(int N, int iSelf, const glm::vec3* pos, const glm::vec3* vel) {
+  glm::vec3 perceived_velocity;
+  glm::vec3 self_position = pos[iSelf];
+  float neighbors = 0.0f;
+
+  for (int i = 0; i < N; i++) {
+    if (i == iSelf) {
+      continue;
+    }
+
+    if (glm::distance(pos[i], self_position) < rule3Distance) {
+      perceived_velocity += vel[i];
+      neighbors++;
+    }
+  }
+
+  if (neighbors == 0) {
+    return glm::vec3(0);
+  }
+
+  perceived_velocity /= neighbors;
+
+  return perceived_velocity * rule3Scale;
+}
+
+
 /**
 * LOOK-1.2 You can use this as a helper for kernUpdateVelocityBruteForce.
 * __device__ code can be called from a __global__ context
@@ -240,10 +351,13 @@ void Boids::copyBoidsToVBO(float *vbodptr_positions, float *vbodptr_velocities) 
 * in the `pos` and `vel` arrays.
 */
 __device__ glm::vec3 computeVelocityChange(int N, int iSelf, const glm::vec3 *pos, const glm::vec3 *vel) {
-  // Rule 1: boids fly towards their local perceived center of mass, which excludes themselves
-  // Rule 2: boids try to stay a distance d away from each other
-  // Rule 3: boids try to match the speed of surrounding boids
-  return glm::vec3(0.0f, 0.0f, 0.0f);
+  glm::vec3 self_velocity = vel[iSelf];
+
+  glm::vec3 rule1Vec = rule1(N, iSelf, pos);
+  glm::vec3 rule2Vec = rule2(N, iSelf, pos);
+  glm::vec3 rule3Vec = rule3(N, iSelf, pos, vel);
+   
+  return self_velocity + rule1Vec + rule2Vec + rule3Vec;
 }
 
 /**
@@ -252,9 +366,24 @@ __device__ glm::vec3 computeVelocityChange(int N, int iSelf, const glm::vec3 *po
 */
 __global__ void kernUpdateVelocityBruteForce(int N, glm::vec3 *pos,
   glm::vec3 *vel1, glm::vec3 *vel2) {
+  int index = threadIdx.x + (blockIdx.x * blockDim.x);
+  if (index >= N) {
+    return;
+  }
+  
   // Compute a new velocity based on pos and vel1
+  glm::vec3 newVel = computeVelocityChange(N, index, pos, vel1);
+
   // Clamp the speed
+  // clamp the velocity changes
+  if (newVel.length() > maxSpeed)
+  {
+    newVel = glm::normalize(newVel) * maxSpeed;
+  }
+
+
   // Record the new velocity into vel2. Question: why NOT vel1?
+  vel2[index] = newVel;
 }
 
 /**
@@ -299,6 +428,23 @@ __global__ void kernComputeIndices(int N, int gridResolution,
     // - Label each boid with the index of its grid cell.
     // - Set up a parallel array of integer indices as pointers to the actual
     //   boid data in pos and vel1/vel2
+
+  int index = threadIdx.x + (blockIdx.x * blockDim.x);
+  if (index >= N) {
+    return;
+  }
+
+  // find 3d grid cell
+  glm::vec3 boid_pos = pos[index];
+  glm::vec3 cell_pos = (boid_pos - gridMin) * inverseCellWidth;
+  cell_pos = glm::floor(cell_pos);
+
+  // find 1d grid index and label it in gridIndices (dev_particleGridIndices)
+  int grid_cell_index = gridIndex3Dto1D(cell_pos.x, cell_pos.y, cell_pos.z, gridResolution);
+  gridIndices[index] = grid_cell_index;
+
+  // integer array of indices as pointers to actual boid data (dev_particleArrayIndices)
+  indices[index] = index;
 }
 
 // LOOK-2.1 Consider how this could be useful for indicating that a cell
@@ -316,6 +462,38 @@ __global__ void kernIdentifyCellStartEnd(int N, int *particleGridIndices,
   // Identify the start point of each cell in the gridIndices array.
   // This is basically a parallel unrolling of a loop that goes
   // "this index doesn't match the one before it, must be a new cell!"
+  int index = threadIdx.x + (blockIdx.x * blockDim.x);
+  if (index >= N) {
+    return;
+  }
+
+  int curr_cell = particleGridIndices[index];
+  int next_cell = particleGridIndices[index + 1];
+
+  if (curr_cell != next_cell) {
+    gridCellEndIndices[curr_cell] = index;
+    gridCellStartIndices[next_cell] = index + 1;
+  }
+
+}
+
+__global__ void kernReshuffleArrays(int N, int* particleGridIndices, 
+  glm::vec3* pos, glm::vec3* sortedPos, glm::vec3* vel, glm::vec3* sortedVel) {
+  int index = threadIdx.x + (blockIdx.x * blockDim.x);
+  if (index >= N) {
+    return;
+  }
+
+  int sorted_index = particleGridIndices[index];
+  sortedPos[index] = pos[sorted_index];
+  sortedVel[index] = vel[sorted_index];
+}
+
+__device__ glm::vec3 calculateCellCoord(glm::vec3 pos, glm::vec3 gridMin, float inverseCellWidth)
+{
+  const auto cellPos = (pos - gridMin) * inverseCellWidth;
+  const auto floor = glm::floor(cellPos);
+  return floor;
 }
 
 __global__ void kernUpdateVelNeighborSearchScattered(
@@ -332,6 +510,84 @@ __global__ void kernUpdateVelNeighborSearchScattered(
   // - Access each boid in the cell and compute velocity change from
   //   the boids rules, if this boid is within the neighborhood distance.
   // - Clamp the speed change before putting the new speed in vel2
+
+   // get thread index
+  int index = threadIdx.x + (blockIdx.x * blockDim.x);
+  if (index >= N) {
+    return;
+  }
+
+  glm::vec3 self_position = pos[index];
+  glm::vec3 self_velocity = vel1[index];
+
+  // identify which cells may contain neighbors
+  float neighborhood_dist = glm::max(glm::max(rule1Distance, rule2Distance), rule3Distance);
+
+  glm::vec3 cell_pos_lower = ((self_position - glm::vec3(neighborhood_dist)) - gridMin) * inverseCellWidth;
+  cell_pos_lower = glm::floor(cell_pos_lower);
+  glm::vec3 cell_pos_higher = ((self_position + glm::vec3(neighborhood_dist)) - gridMin) * inverseCellWidth;
+  cell_pos_higher = glm::floor(cell_pos_higher);
+
+  glm::vec3 perceived_center;
+  glm::vec3 c;
+  glm::vec3 perceived_velocity;
+  int neighbors1 = 0;
+  int neighbors3 = 0;
+
+  // for each cell, read the start/end indices in the boid pointer array.
+  for (int z = cell_pos_lower.z; z <= cell_pos_higher.z; z++) {
+    for (int y = cell_pos_lower.y; y <= cell_pos_higher.y; y++) {
+      for (int x = cell_pos_lower.x; x <= cell_pos_higher.x; x++) {
+        // read the start/end indices in the boid pointer array.
+        int cellIndex = gridIndex3Dto1D(x, y, z, gridResolution);
+
+        int start_index = gridCellStartIndices[cellIndex];
+        int end_index = gridCellEndIndices[cellIndex];
+
+        //   Access each boid in the cell and compute velocity change from
+        //   the boids rules, if this boid is within the neighborhood distance.
+        for (int i = start_index; i <= end_index; i++) {
+          int boid_index = particleArrayIndices[i];
+
+          if (index == boid_index) continue;
+
+          glm::vec3 boid_position = pos[boid_index];
+          float dist = glm::distance(boid_position, self_position);
+
+          if (dist < rule1Distance) {
+            perceived_center += boid_position;
+            neighbors1++;
+          }
+          if (dist < rule2Distance) {
+            c -= boid_position - self_position;
+          }
+          if (dist < rule3Distance) {
+            perceived_velocity += vel1[boid_index];
+            neighbors3++;
+          }
+          
+        }
+      }
+    }
+  }
+
+  if (neighbors1 > 0) perceived_center /= neighbors1;
+  if (neighbors3 > 0) perceived_velocity /= neighbors3;
+
+  glm::vec3 rule1Vec = (perceived_center - self_position) * rule1Scale;
+  glm::vec3 rule2Vec = c * rule2Scale;
+  glm::vec3 rule3Vec = perceived_velocity * rule3Scale;
+
+  glm::vec3 newVec = self_velocity + rule1Vec + rule2Vec + rule3Vec;
+
+  // clamp the velocity changes
+  if (newVec.length() > maxSpeed)
+  {
+    newVec = glm::normalize(newVec) * maxSpeed;
+  }
+
+  // feed into vel2
+  vel2[index] = newVec;
 }
 
 __global__ void kernUpdateVelNeighborSearchCoherent(
@@ -351,6 +607,82 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
   // - Access each boid in the cell and compute velocity change from
   //   the boids rules, if this boid is within the neighborhood distance.
   // - Clamp the speed change before putting the new speed in vel2
+
+   // get thread index
+  int index = threadIdx.x + (blockIdx.x * blockDim.x);
+  if (index >= N) {
+    return;
+  }
+
+  glm::vec3 self_position = pos[index];
+  glm::vec3 self_velocity = vel1[index];
+
+  // identify which cells may contain neighbors
+  float neighborhood_dist = glm::max(glm::max(rule1Distance, rule2Distance), rule3Distance);
+
+  glm::vec3 cell_pos_lower = ((self_position - glm::vec3(neighborhood_dist)) - gridMin) * inverseCellWidth;
+  cell_pos_lower = glm::floor(cell_pos_lower);
+  glm::vec3 cell_pos_higher = ((self_position + glm::vec3(neighborhood_dist)) - gridMin) * inverseCellWidth;
+  cell_pos_higher = glm::floor(cell_pos_higher);
+
+  glm::vec3 perceived_center;
+  glm::vec3 c;
+  glm::vec3 perceived_velocity;
+  int neighbors1 = 0;
+  int neighbors3 = 0;
+
+  // for each cell, read the start/end indices in the boid pointer array.
+  for (int z = cell_pos_lower.z; z <= cell_pos_higher.z; z++) {
+    for (int y = cell_pos_lower.y; y <= cell_pos_higher.y; y++) {
+      for (int x = cell_pos_lower.x; x <= cell_pos_higher.x; x++) {
+        // read the start/end indices in the boid pointer array.
+        int cellIndex = gridIndex3Dto1D(x, y, z, gridResolution);
+
+        int start_index = gridCellStartIndices[cellIndex];
+        int end_index = gridCellEndIndices[cellIndex];
+
+        //   Access each boid in the cell and compute velocity change from
+        //   the boids rules, if this boid is within the neighborhood distance.
+        for (int i = start_index; i <= end_index; i++) {
+          if (index == i) continue;
+
+          glm::vec3 boid_position = pos[i];
+          float dist = glm::distance(boid_position, self_position);
+
+          if (dist < rule1Distance) {
+            perceived_center += boid_position;
+            neighbors1++;
+          }
+          if (dist < rule2Distance) {
+            c -= boid_position - self_position;
+          }
+          if (dist < rule3Distance) {
+            perceived_velocity += vel1[i];
+            neighbors3++;
+          }
+
+        }
+      }
+    }
+  }
+
+  if (neighbors1 > 0) perceived_center /= neighbors1;
+  if (neighbors3 > 0) perceived_velocity /= neighbors3;
+
+  glm::vec3 rule1Vec = (perceived_center - self_position) * rule1Scale;
+  glm::vec3 rule2Vec = c * rule2Scale;
+  glm::vec3 rule3Vec = perceived_velocity * rule3Scale;
+
+  glm::vec3 newVec = self_velocity + rule1Vec + rule2Vec + rule3Vec;
+
+  // clamp the velocity changes
+  if (newVec.length() > maxSpeed)
+  {
+    newVec = glm::normalize(newVec) * maxSpeed;
+  }
+
+  // feed into vel2
+  vel2[index] = newVec;
 }
 
 /**
@@ -358,7 +690,16 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
 */
 void Boids::stepSimulationNaive(float dt) {
   // TODO-1.2 - use the kernels you wrote to step the simulation forward in time.
+  dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
+
+  kernUpdateVelocityBruteForce <<<fullBlocksPerGrid, blockSize >>> (numObjects, dev_pos, dev_vel1, dev_vel2);
+  checkCUDAErrorWithLine("kernUpdateVelocityBruteForce failed!");
+  kernUpdatePos <<<fullBlocksPerGrid, blockSize >>> (numObjects, dt, dev_pos, dev_vel1);
+  checkCUDAErrorWithLine("kernUpdatePos failed!");
+  
   // TODO-1.2 ping-pong the velocity buffers
+  cudaMemcpy(dev_vel1, dev_vel2, sizeof(glm::vec3) * numObjects, cudaMemcpyDeviceToDevice);
+  checkCUDAErrorWithLine("cudaMemcpy failed!");
 }
 
 void Boids::stepSimulationScatteredGrid(float dt) {
@@ -374,6 +715,35 @@ void Boids::stepSimulationScatteredGrid(float dt) {
   // - Perform velocity updates using neighbor search
   // - Update positions
   // - Ping-pong buffers as needed
+
+  dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
+
+  // label each particle with its array index and grid index.
+  kernComputeIndices << <fullBlocksPerGrid, blockSize >> > (numObjects, gridSideCount,
+    gridMinimum, gridInverseCellWidth, dev_pos, dev_particleArrayIndices, dev_particleGridIndices);
+
+  // unstable key sort using thrust
+  // wrap device vectors in thrust iterators
+  thrust::device_ptr<int> dev_thrust_particleArrayIndices(dev_particleArrayIndices);
+  thrust::device_ptr<int> dev_thrust_particleGridIndices(dev_particleGridIndices);
+
+  // sort boids by what grid they belong in
+  thrust::sort_by_key(dev_thrust_particleGridIndices, dev_thrust_particleGridIndices + numObjects, dev_thrust_particleArrayIndices);
+
+  // finding start and end indices of each cell's data pointers
+  kernIdentifyCellStartEnd<<<fullBlocksPerGrid, blockSize>>>(numObjects, dev_particleGridIndices, dev_gridCellStartIndices, dev_gridCellEndIndices);
+
+  // perform velocity updates using neighbor search
+  kernUpdateVelNeighborSearchScattered<<<fullBlocksPerGrid, blockSize>>>(numObjects, gridSideCount, gridMinimum,
+    gridInverseCellWidth, gridCellWidth, dev_gridCellStartIndices, dev_gridCellEndIndices, dev_particleArrayIndices,
+    dev_pos, dev_vel1, dev_vel2);
+
+  // update positions
+  kernUpdatePos << <fullBlocksPerGrid, blockSize >> > (numObjects, dt, dev_pos, dev_vel1);
+
+  // ping pong buffers
+  cudaMemcpy(dev_vel1, dev_vel2, sizeof(glm::vec3) * numObjects, cudaMemcpyDeviceToDevice);
+  checkCUDAErrorWithLine("cudaMemcpy failed!");
 }
 
 void Boids::stepSimulationCoherentGrid(float dt) {
@@ -392,6 +762,39 @@ void Boids::stepSimulationCoherentGrid(float dt) {
   // - Perform velocity updates using neighbor search
   // - Update positions
   // - Ping-pong buffers as needed. THIS MAY BE DIFFERENT FROM BEFORE.
+
+  dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
+
+  // label each particle with its array index and grid index.
+  kernComputeIndices << <fullBlocksPerGrid, blockSize >> > (numObjects, gridSideCount,
+    gridMinimum, gridInverseCellWidth, dev_pos, dev_particleArrayIndices, dev_particleGridIndices);
+
+  // unstable key sort using thrust
+  // wrap device vectors in thrust iterators
+  thrust::device_ptr<int> dev_thrust_particleArrayIndices(dev_particleArrayIndices);
+  thrust::device_ptr<int> dev_thrust_particleGridIndices(dev_particleGridIndices);
+
+  // sort boids by what grid they belong in
+  thrust::sort_by_key(dev_thrust_particleGridIndices, dev_thrust_particleGridIndices + numObjects, dev_thrust_particleArrayIndices);
+
+  // finding start and end indices of each cell's data pointers
+  kernIdentifyCellStartEnd << <fullBlocksPerGrid, blockSize >> > (numObjects, dev_particleGridIndices, dev_gridCellStartIndices, dev_gridCellEndIndices);
+
+  // reshuffle particle data
+  kernReshuffleArrays << <fullBlocksPerGrid, blockSize >> > (numObjects, dev_particleArrayIndices, dev_pos, dev_coherent_pos, dev_vel1, dev_coherent_vel);
+
+  // perform velocity updates using neighbor search
+  kernUpdateVelNeighborSearchCoherent << <fullBlocksPerGrid, blockSize >> > (numObjects, gridSideCount, gridMinimum,
+    gridInverseCellWidth, gridCellWidth, dev_gridCellStartIndices, dev_gridCellEndIndices,
+    dev_coherent_pos, dev_coherent_vel, dev_vel2);
+
+  // update position
+  kernUpdatePos << <fullBlocksPerGrid, blockSize >> > (numObjects, dt, dev_coherent_pos, dev_vel2);
+  
+  // ping pong buffers
+  cudaMemcpy(dev_pos, dev_coherent_pos, sizeof(glm::vec3) * numObjects, cudaMemcpyDeviceToDevice);
+  cudaMemcpy(dev_vel1, dev_vel2, sizeof(glm::vec3) * numObjects, cudaMemcpyDeviceToDevice);
+  checkCUDAErrorWithLine("cudaMemcpy failed!");
 }
 
 void Boids::endSimulation() {
@@ -400,6 +803,13 @@ void Boids::endSimulation() {
   cudaFree(dev_pos);
 
   // TODO-2.1 TODO-2.3 - Free any additional buffers here.
+  cudaFree(dev_particleArrayIndices);
+  cudaFree(dev_particleGridIndices);
+  cudaFree(dev_gridCellStartIndices);
+  cudaFree(dev_gridCellEndIndices);
+
+  cudaFree(dev_coherent_pos);
+  cudaFree(dev_coherent_vel);
 }
 
 void Boids::unitTest() {
