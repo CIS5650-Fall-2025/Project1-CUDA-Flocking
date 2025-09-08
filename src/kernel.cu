@@ -537,6 +537,7 @@ void Boids::stepSimulationScatteredGrid(float dt) {
   // Uniform Grid Neighbor search using Thrust sort.
 
     int blocks = (numObjects + blockSize - 1) / blockSize;
+    int blocksForCell = (gridCellCount + blockSize - 1) / blockSize;
 
   // In Parallel:
   // - label each particle with its array index as well as its grid index.
@@ -553,8 +554,8 @@ void Boids::stepSimulationScatteredGrid(float dt) {
 
   // - Naively unroll the loop for finding the start and end indices of each
   //   cell's data pointers in the array of boid indices
-    kernResetIntBuffer<<<blocks, blockSize>>>(numObjects, dev_gridCellStartIndices, -1);
-    kernResetIntBuffer<<<blocks, blockSize>>>(numObjects, dev_gridCellEndIndices, -1);
+    kernResetIntBuffer<<<blocksForCell, blockSize>>>(gridCellCount, dev_gridCellStartIndices, -1);
+    kernResetIntBuffer<<<blocksForCell, blockSize>>>(gridCellCount, dev_gridCellEndIndices, -1);
     checkCUDAErrorWithLine("kernResetIntBuffer failed!");
     
     kernIdentifyCellStartEnd<<<blocks, blockSize>>>(numObjects, dev_particleGridIndices,
