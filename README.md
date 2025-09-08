@@ -32,5 +32,23 @@ For all three implementations, increasing the boid count would slow the simulati
 The naïve implementation being the most severely affected by the increased boid count is to be expected as in that implementation every thread needs to loop through all of the boids in the simulation, so for example by doubling the number of boids (such as from 5,000 to 10,000) we double both the number of threads and how many iterations each of them needs to make to finish, leading to the simulation step length more than doubling. The grid implementations, where each thread only needs to iterate through the boids within the neighboring cells, seem to only have severe slowdown once the number of boids passes some threshold; this appears to occur for a lower number of boids in the non-coherent implementation. Since we're increasing the number of boids without changing the number of cells (leaving the scene scale and neighborhood radii consistent), the density of boids in each cell increases, meaning even with a thread only checking the boids in 8 neighboring cells, it still has to iterate through an increasing number of boids. This leads to longer-running threads, which eventually seem to become a bottleneck and cause stalls. This happens slightly sooner for the non-coherent uniform grid implementation as the scattered memory structure slows the threads further—we both have more reads from global memory (reading the index array alongside the other arrays) and the reads are less efficient as they require accessing very disjunct regions in memory.
 
 - For each implementation, how does changing the block count and block size affect performance? Why do you think this is?
+
+![](images/Time%20Per%20Step%20(ms)%20vs.%20Block%20Size%20with%205,000%20Boids.png)
+![](images/Simulation%20Steps%20Per%20Second%20vs.%20Block%20Size%20with%205,000%20Boids.png)
+![](images/Time%20Per%20Step%20(ms)%20vs.%20Block%20Size%20with%2050,000%20Boids.png)
+![](images/Simulation%20Steps%20Per%20Second%20vs.%20Block%20Size%20with%2050,000%20Boids.png)
+
+TODO
+
 - For the coherent uniform grid: did you experience any performance improvements with the more coherent uniform grid? Was this the outcome you expected? Why or why not?
+
+The coherent uniform grid performed better than the non-coherent uniform grid in the vast majority of cases, with this improvement becoming more pronounced for greater numbers of boids. TODO
+
 - Did changing cell width and checking 27 vs 8 neighboring cells affect performance? Why or why not? Be careful: it is insufficient (and possibly incorrect) to say that 27-cell is slower simply because there are more cells to check!
+
+![](images/Time%20Per%20Step%20(ms)%20vs.%20Boid%20Count%20for%20Different%20Cell%20Checking%20Methods.png)
+![](images/Simulation%20Steps%20Per%20Second%20vs%20Boid%20Count%20for%20Different%20Cell%20Checking.png)
+![](images/Time%20Per%20Step%20(ms)%20vs.%20Scene%20Scale%20for%20Different%20Cell%20Checking%20Methods.png)
+![](images/Simulation%20Steps%20Per%20Second%20vs.%20Scene%20Scale%20for%20Different%20Cell%20Checking%20Methods.png)
+
+TODO
