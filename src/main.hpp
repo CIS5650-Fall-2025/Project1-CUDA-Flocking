@@ -54,17 +54,17 @@ int main(int argc, char* argv[]);
 //====================================
 // Main loop
 //====================================
-void mainLoop();
+void mainLoop(int numBoids, int blockSize);
 void errorCallback(int error, const char *description);
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
 void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
 void mousePositionCallback(GLFWwindow* window, double xpos, double ypos);
 void updateCamera();
-void runCUDA();
+void runCUDA(int numBoids, int blockSize);
 
 //====================================
 // Setup/init Stuff
 //====================================
-bool init(int argc, char **argv);
-void initVAO();
+bool init(int numBoids, int blockSize);
+void initVAO(int numBoids);
 void initShaders(GLuint *program);

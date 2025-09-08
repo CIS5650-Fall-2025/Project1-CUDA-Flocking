@@ -1,7 +1,7 @@
 #pragma once
 
 namespace Boids {
-    void initSimulation(int N);
+    void initSimulation(int N, int numBlocks);
     void stepSimulationNaive(float dt);
     void stepSimulationScatteredGrid(float dt);
     void stepSimulationCoherentGrid(float dt);
