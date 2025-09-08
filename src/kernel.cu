@@ -61,6 +61,13 @@ void checkCUDAError(const char *msg, int line = -1) {
 
 #define maxSpeed 1.0f
 
+// Toggles the grid looping optimization on and off
+#define GRID_LOOPING_OPTIMIZATION 0
+// Controls the width of the grid cells in the uniform grid. 1 is the neighborhood distance and corresponds to checking 27 surrounding cells 
+// and 2 is double the neighborhood distance and corresponds to checking 8 surrounding cells. Can adjust to different levels long with the grid 
+// looping to create smaller cells, but also check less area outside the distance radius for each rule
+#define GRID_WIDTH_SCALE 2.0f
+
 /*! Size of the starting area in simulation space. */
 #define scene_scale 100.0f
 
@@ -102,6 +109,9 @@ glm::vec3* dev_pos2;
 // These are automatically computed for you in Boids::initSimulation
 int gridCellCount;
 int gridSideCount;
+
+// Set to double neighborhood distance (10) to check 8 surrounding 
+// cells, set to neighborhood distance (5) to check 27 surrounding cells
 float gridCellWidth;
 float gridInverseCellWidth;
 glm::vec3 gridMinimum;
@@ -169,7 +179,7 @@ void Boids::initSimulation(int N) {
   checkCUDAErrorWithLine("kernGenerateRandomPosArray failed!");
 
   // LOOK-2.1 computing grid params
-  gridCellWidth = 2.0f * std::max(std::max(rule1Distance, rule2Distance), rule3Distance);
+  gridCellWidth = GRID_WIDTH_SCALE * std::max(std::max(rule1Distance, rule2Distance), rule3Distance);
   int halfSideCount = (int)(scene_scale / gridCellWidth) + 1;
   gridSideCount = 2 * halfSideCount;
 
@@ -440,13 +450,13 @@ __global__ void kernUpdateVelNeighborSearchScattered(
   float neighborhoodDist = imax(imax(rule1Distance, rule2Distance), rule3Distance);
   glm::vec3 neighborhoodMinPos = pos[index] - glm::vec3(neighborhoodDist);
   glm::vec3 neighborhoodMaxPos = pos[index] + glm::vec3(neighborhoodDist);
-  glm::ivec3 nieghborhoodMinIdx3D = glm::ivec3((neighborhoodMinPos - gridMin) * inverseCellWidth);
-  glm::ivec3 nieghborhoodMaxIdx3D = glm::ivec3((neighborhoodMaxPos - gridMin) * inverseCellWidth);
+  glm::ivec3 nieghborhoodMinIdx3D = glm::ivec3(glm::floor((neighborhoodMinPos - gridMin) * inverseCellWidth));
+  glm::ivec3 nieghborhoodMaxIdx3D = glm::ivec3(glm::ceil((neighborhoodMaxPos - gridMin) * inverseCellWidth));
 
-  // Iterate through all potential neighbor cells
-  for (int x = nieghborhoodMinIdx3D.x; x <= nieghborhoodMaxIdx3D.x; x++) {
-    for (int y = nieghborhoodMinIdx3D.y; y <= nieghborhoodMaxIdx3D.y; y++) {
-      for (int z = nieghborhoodMinIdx3D.z; z <= nieghborhoodMaxIdx3D.z; z++) {
+  // Iterate through all potential neighbor cells in a cube
+  for (int x = nieghborhoodMinIdx3D.x; x < nieghborhoodMaxIdx3D.x; x += 1) {
+    for (int y = nieghborhoodMinIdx3D.y; y < nieghborhoodMaxIdx3D.y; y += 1) {
+      for (int z = nieghborhoodMinIdx3D.z; z < nieghborhoodMaxIdx3D.z; z += 1) {
         glm::ivec3 neighborGridIdx3D = glm::ivec3(x, y, z);
         // Check if neighborGridIdx3D is within bounds
         if (neighborGridIdx3D.x < 0 || neighborGridIdx3D.x >= gridResolution ||
@@ -454,6 +464,20 @@ __global__ void kernUpdateVelNeighborSearchScattered(
           neighborGridIdx3D.z < 0 || neighborGridIdx3D.z >= gridResolution) {
           continue;
         }
+
+        // If using Grid-Looping optimization, Check if any part of the cell is within the neighborhood distance
+        if (GRID_LOOPING_OPTIMIZATION) {
+          glm::vec3 gridCellMin = gridMin + glm::vec3(neighborGridIdx3D) * cellWidth;
+          glm::vec3 gridCellMax = gridCellMin + glm::vec3(cellWidth);
+          // Compute closest point in grid cell to boid position
+          glm::vec3 closest = glm::clamp(pos[index], gridCellMin, gridCellMax);
+          // See if distance to closest point is within neighborhood distance
+          float dist = glm::distance(closest, pos[index]);
+          if (dist > neighborhoodDist) {
+            continue;
+          }
+        }
+
         // Check its start and end indices and that it has at least one boid
         int neighborGridIdx1D = gridIndex3Dto1D(neighborGridIdx3D.x, neighborGridIdx3D.y, neighborGridIdx3D.z, gridResolution);
         int startIdx = gridCellStartIndices[neighborGridIdx1D];
@@ -568,15 +592,15 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
   float neighborhoodDist = imax(imax(rule1Distance, rule2Distance), rule3Distance);
   glm::vec3 neighborhoodMinPos = pos[index] - glm::vec3(neighborhoodDist);
   glm::vec3 neighborhoodMaxPos = pos[index] + glm::vec3(neighborhoodDist);
-  glm::ivec3 nieghborhoodMinIdx3D = glm::ivec3((neighborhoodMinPos - gridMin) * inverseCellWidth);
-  glm::ivec3 nieghborhoodMaxIdx3D = glm::ivec3((neighborhoodMaxPos - gridMin) * inverseCellWidth);
+  glm::ivec3 nieghborhoodMinIdx3D = glm::ivec3(glm::floor((neighborhoodMinPos - gridMin) * inverseCellWidth));
+  glm::ivec3 nieghborhoodMaxIdx3D = glm::ivec3(glm::ceil((neighborhoodMaxPos - gridMin) * inverseCellWidth));
 
   // Iterate through all potential neighbor cells, iterate in z, y, x order because when calculating the 1D index x changes 
   // index by 1, y changes index by gridResolution, and z changes index by gridResolution^2 (so having x in innermost for loop 
   // maximizes memory coherence)
-  for (int z = nieghborhoodMinIdx3D.z; z <= nieghborhoodMaxIdx3D.z; z++) {
-    for (int y = nieghborhoodMinIdx3D.y; y <= nieghborhoodMaxIdx3D.y; y++) {
-      for (int x = nieghborhoodMinIdx3D.x; x <= nieghborhoodMaxIdx3D.x; x++) {
+  for (int z = nieghborhoodMinIdx3D.z; z < nieghborhoodMaxIdx3D.z; z++) {
+    for (int y = nieghborhoodMinIdx3D.y; y < nieghborhoodMaxIdx3D.y; y++) {
+      for (int x = nieghborhoodMinIdx3D.x; x < nieghborhoodMaxIdx3D.x; x++) {
         glm::ivec3 neighborGridIdx3D = glm::ivec3(x, y, z);
         // Check if neighborGridIdx3D is within bounds
         if (neighborGridIdx3D.x < 0 || neighborGridIdx3D.x >= gridResolution ||
@@ -584,6 +608,20 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
           neighborGridIdx3D.z < 0 || neighborGridIdx3D.z >= gridResolution) {
           continue;
         }
+
+        // If using Grid-Looping optimization, Check if any part of the cell is within the neighborhood distance
+        if (GRID_LOOPING_OPTIMIZATION) {
+          glm::vec3 gridCellMin = gridMin + glm::vec3(neighborGridIdx3D) * cellWidth;
+          glm::vec3 gridCellMax = gridCellMin + glm::vec3(cellWidth);
+          // Compute closest point in grid cell to boid position
+          glm::vec3 closest = glm::clamp(pos[index], gridCellMin, gridCellMax);
+          // See if distance to closest point is within neighborhood distance
+          float dist = glm::distance(closest, pos[index]);
+          if (dist > neighborhoodDist) {
+            continue;
+          }
+        }
+
         // Check its start and end indices and that it has at least one boid
         int neighborGridIdx1D = gridIndex3Dto1D(neighborGridIdx3D.x, neighborGridIdx3D.y, neighborGridIdx3D.z, gridResolution);
         int startIdx = gridCellStartIndices[neighborGridIdx1D];
