@@ -7,7 +7,7 @@
 Project 1 CUDA Flocking
 ====================
 
-This project implements a GPU-accelerated simulation of flocking behavior in CUDA using three different versions: a naive all-pairs implementation, a uniform grid with scattered memory access, and a coherent grid with improved memory locality. Performance comparisons show how spatial partitioning and memory layout optimizations enable scaling to tens of thousands of boids in real time.
+This project implements a GPU-accelerated simulation of flocking behavior in CUDA using three different versions: a naive all-pairs implementation, a uniform grid, and a coherent grid with improved memory locality. Performance comparisons show how spatial partitioning and memory layout optimizations enable scaling to tens of thousands of boids in real time.
 
 ![Flocking Animation](images/boids.gif)
 <br>
