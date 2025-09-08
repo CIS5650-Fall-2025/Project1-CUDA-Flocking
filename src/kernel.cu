@@ -47,7 +47,7 @@ void checkCUDAError(const char *msg, int line = -1) {
 *****************/
 
 /*! Block size used for CUDA kernel launch. */
-#define blockSize 128
+#define blockSize 64
 
 // LOOK-1.2 Parameters for the boids algorithm.
 // These worked well in our reference implementation.
@@ -375,9 +375,12 @@ __global__ void kernUpdateVelocityBruteForce(int N, glm::vec3 *pos,
   glm::vec3 newVel = computeVelocityChange(N, index, pos, vel1);
 
   // Clamp the speed
-  newVel.x = clamp(newVel.x, -maxSpeed, maxSpeed);
-  newVel.y = clamp(newVel.y, -maxSpeed, maxSpeed);
-  newVel.z = clamp(newVel.z, -maxSpeed, maxSpeed);
+  // clamp the velocity changes
+  if (newVel.length() > maxSpeed)
+  {
+    newVel = glm::normalize(newVel) * maxSpeed;
+  }
+
 
   // Record the new velocity into vel2. Question: why NOT vel1?
   vel2[index] = newVel;
