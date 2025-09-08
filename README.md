@@ -47,8 +47,7 @@ The Uniform Grid (Scattered) approach partitions boids into a spatial grid by so
 
 The Coherent Grid implementation eliminates this indirection. After sorting, it adds a data reshuffling step which physically reorders the position and velocity arrays in global memory to match the sorted grid order. This "cuts out the middleman" and ensures that threads processing boids within the same grid cell access a contiguous block of memory. This leads to a more cache-friendly and coalesced memory access pattern.
 
-** Fps With Block Size **
-![BlockSize](images/05BlockSize.png)
+** Fps With Block Size**![BlockSize](images/05BlockSize.png)
 
 This chart illustrates the impact of CUDA block size on the performance (in Frames Per Second) of the Naive, Uniform Grid, and Coherent Grid implementations.
 
