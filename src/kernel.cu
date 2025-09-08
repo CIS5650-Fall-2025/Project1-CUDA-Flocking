@@ -52,12 +52,12 @@ void checkCUDAError(const char *msg, int line = -1) {
 // LOOK-1.2 Parameters for the boids algorithm.
 // These worked well in our reference implementation.
 #define rule1Distance 5.0f
-#define rule2Distance 3.0f
-#define rule3Distance 8.0f // originally 5.0
+#define rule2Distance 2.0f
+#define rule3Distance 5.0f
 
 #define rule1Scale 0.01f
 #define rule2Scale 0.1f
-#define rule3Scale 0.5f // originally 0.1
+#define rule3Scale 0.1f
 
 #define maxSpeed 1.0f
 
@@ -194,9 +194,6 @@ void Boids::initSimulation(int N) {
   cudaMalloc((void**)&dev_gridCellEndIndices, gridCellCount * sizeof(int));
   checkCUDAErrorWithLine("cudaMalloc dev_gridCellEndIndices failed!");
 
-
-
-
   dev_thrust_particleArrayIndices = thrust::device_ptr<int>(dev_particleArrayIndices);
   dev_thrust_particleGridIndices = thrust::device_ptr<int>(dev_particleGridIndices);
 
@@ -305,7 +302,7 @@ __device__ glm::vec3 computeVelocityChange(int N, int iSelf, const glm::vec3* po
 
     // Rule 3
     pv = (rule3Nb == 0) ? glm::vec3(0.f) : (pv / (float)rule3Nb);
-    velocity += (pv - vel[iSelf]) * rule3Scale;
+    velocity += pv * rule3Scale;
 
     velocity += vel[iSelf];
     if (glm::length(velocity) > maxSpeed) {
@@ -501,7 +498,7 @@ __global__ void kernUpdateVelNeighborSearchScattered(
 
     // Rule 3
     pv = (rule3Nb == 0) ? glm::vec3(0.f) : (pv / (float)rule3Nb);
-    velocity += (pv - vel1[idx]) * rule3Scale;
+    velocity += pv * rule3Scale;
 
     velocity += vel1[idx];
     if (glm::length(velocity) > maxSpeed) {
@@ -597,7 +594,7 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
 
     // Rule 3
     pv = (rule3Nb == 0) ? glm::vec3(0.f) : (pv / (float)rule3Nb);
-    velocity += (pv - vel1[idx]) * rule3Scale;
+    velocity += pv * rule3Scale;
 
     velocity += vel1[idx];
     if (glm::length(velocity) > maxSpeed) {
