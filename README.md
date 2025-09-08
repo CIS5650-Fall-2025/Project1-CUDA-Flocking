@@ -2,7 +2,6 @@
 Project 1 - Flocking**
 
 * Name: Harry Guan (17885658)
-  * (TODO) [LinkedIn](), [personal website](), [twitter](), etc.
 * Tested on: Windows 11, Intel i7-14700 @ 2.10GHz 32GB, NVIDIA T1000 4GB (Moore 100B virtual labs)
 
 ### Introducton
@@ -71,4 +70,4 @@ Yes although rather minor, you can see this through the data and it was expected
 ![](images/graph-3.png)
 
 ### Did changing cell width and checking 27 vs 8 neighboring cells affect performance? Why or why not? Be careful: it is insufficient (and possibly incorrect) to say that 27-cell is slower simply because there are more cells to check!
-Despite being more cells to check, the 27 neighboring cells outperforms the 8 neighboring cells. This is because, although there are more cells to check, each cell contains smaller amounts of boids which means that there are fewer boids to check.
+Despite being more cells to check, the 27 neighboring cells outperforms the 8 neighboring cells. This is because, although there are more cells to check, each cell's width is smaller which means that there are fewer boids to check.
