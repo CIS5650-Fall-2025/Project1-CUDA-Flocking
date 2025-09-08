@@ -1,13 +1,11 @@
-Project 1 CUDA Flocking
-====================
-
 **University of Pennsylvania, CIS 5650: GPU Programming and Architecture, Project 1**
 
 * Yannick Gachnang
   * [LinkedIn](https://www.linkedin.com/in/yannickga/)
 * Tested on: Windows 10, EPYC 9354 @ 3.25GHz, 16GB RAM, RTX 2000 Ada 23GB VRAM
 
----
+Project 1 CUDA Flocking
+====================
 
 ## Implementation
 
@@ -64,8 +62,7 @@ Next I compared only the GPU versions. Here I started at 5000 boids since the re
 
 ![FPS vs #Boids](images/fps_vs_num_boids_high.png)
 
-The simple GPU version holds up for a while but then quickly becomes unusable once we move past 10k boids. At 50k boids it is running at less than 1 FPS. The grid-based versions scale much better.
-The uniform grid is at ~56 FPS and the coherent grid is at ~66 FPS at 50k boids. Both versions stay relatively constant at around 290 FPS for very small boid counts (although uniform grid maintains a slight lead), but once the number of boids goes up the grid approaches clearly win. And the higher the boid count, the more the coherent grid approach tends to win compared to the uniform grid.
+The simple GPU version holds up for a while but then quickly becomes unusable once we move past 10k boids. At 50k boids it is running at less than 1 FPS. The grid-based versions scale much better. The uniform grid is at ~56 FPS and the coherent grid is at ~66 FPS at 50k boids. Both versions stay relatively constant at around 290 FPS for very small boid counts (although uniform grid maintains a slight lead), but once the number of boids goes up the grid approaches clearly win. And the higher the boid count, the more the coherent grid approach tends to win compared to the uniform grid.
 
 <details>
   <summary>Raw Data</summary>
@@ -92,8 +89,7 @@ I then tested the effect of different neighborhood sizes. I tested 8 cells, 27 c
 ![FPS vs #Neighbor cells](images/neighbor_cells_uniform.png)
 ![FPS vs #Neighbor cells](images/neighbor_cells_coherent.png)
 
-At small boid counts the 8-cell version is slightly faster, but once the boid count increases the 27-cell version becomes the best option. At 10k boids the uniform grid runs at ~230 FPS with 27 cells compared to ~191 FPS with 8 cells.
-At 50k boids the coherent grid with 27 cells is at ~101 FPS compared to only ~66 FPS with 8 cells. The 125-cell version usually sits in between. It often beats 8 cells at high boid counts but is slower than the 27-cell version. While the project instructions tells us to use an 8 cell version, 27 neighbor cells seems to be the sweet spot here. I believe this is because with overly large cells, we have more volume where boids can reside that are not in the interaction radius. But smaller cells require more iterations to go through so that we end up striking a balance between these two factors at 27 cells. 
+At small boid counts the 8-cell version is slightly faster, but once the boid count increases the 27-cell version becomes the best option. At 10k boids the uniform grid runs at ~230 FPS with 27 cells compared to ~191 FPS with 8 cells. At 50k boids the coherent grid with 27 cells is at ~101 FPS compared to only ~66 FPS with 8 cells. The 125-cell version usually sits in between. It often beats 8 cells at high boid counts but is slower than the 27-cell version. While the project instructions tells us to use an 8 cell version, 27 neighbor cells seems to be the sweet spot here. I believe this is because with overly large cells, we have more volume where boids can reside that are not in the interaction radius. But smaller cells require more iterations to go through so that we end up striking a balance between these two factors at 27 cells. 
 
 <details>
   <summary>Raw Data</summary>
@@ -116,11 +112,8 @@ I also tested the effect of block size. I used 50k boids and the 8-cell configur
 
 ![FPS vs Block Size](images/block_size.png)
 
-For the uniform grid the results are basically flat across all block sizes, going from ~57 FPS at 32 threads to ~53 FPS at 512 threads. This indicates that performance here is dominated by scattered memory access rather than scheduling.
-I tried to profile the kernels to confirm whether this was the case for the uniform grid implementation using both Nsight Systems and Nsight Compute.
-Nsight Systems only gave me timeline information without the memory throughput and occupancy metrics I needed. Nsight Compute unfortunately kept crashing (like in Project0), so I wasn’t able to see the occupancy or memory throughput.
-Because of this I can’t verify whether the memory access is the bottleneck, but the flat performance across block sizes for the uniform grid still strongly suggests that scattered memory access is the limiting factor here.
-For the coherent grid the block size actually makes a difference. It peaked at ~66 FPS with 128 threads per block and then dropped down again to ~55 FPS at 512 threads. This is more in line with what we expect, since small blocks underutilize the GPU and large blocks reduce occupancy.  
+For the uniform grid the results are basically flat across all block sizes, going from ~57 FPS at 32 threads to ~53 FPS at 512 threads. This indicates that performance here is dominated by scattered memory access rather than scheduling. I tried to profile the kernels to confirm whether this was the case for the uniform grid implementation using both Nsight Systems and Nsight Compute.
+Nsight Systems only gave me timeline information without the memory throughput and occupancy metrics I needed. Nsight Compute unfortunately kept crashing (like in Project0), so I wasn’t able to see the occupancy or memory throughput. Because of this I can’t verify whether the memory access is the bottleneck, but the flat performance across block sizes for the uniform grid still strongly suggests that scattered memory access is the limiting factor here. For the coherent grid the block size actually makes a difference. It peaked at ~66 FPS with 128 threads per block and then dropped down again to ~55 FPS at 512 threads. This is more in line with what I expected, since small blocks tend to underutilize the GPU and large blocks tend to reduce occupancy.  
 
 
 <details>
@@ -136,4 +129,46 @@ For the coherent grid the block size actually makes a difference. It peaked at ~
   
 </details>
 
-### FPS vs Periodic Distance
+### FPS vs Wrapping Distance
+
+Finally I tested the effect of calculating distance with periodic wrapping across the simulation boundary. I compared this against the standard distance calculation for the simple GPU version, the uniform grid, and the coherent grid. For all of these tests I used the 8-cell neighborhood configuration.
+
+![Wrapping Cost](images/wrap_cost.png)
+
+Despite some optimizations, the simple GPU version suffers the most from wrapping. At 1000 boids it drops from ~246 FPS to ~153 FPS and at 10k boids it goes from ~21 FPS to ~12 FPS. This makes sense since every extra branch in the distance check is executed $O(n^2)$ times. The uniform and coherent grid versions are hit less hard. At 10k boids the uniform grid drops from ~191 FPS to ~158 FPS and the coherent grid drops from ~196 FPS to ~160 FPS. The overhead is still there but since the number of distance checks is reduced by the grid, the effect is smaller. Overall, wrapping clearly adds extra cost, but the impact is only severe in the naive version. For the grid-based approaches the FPS loss is noticeable but not catastrophic. The intent behind adding this was to have a more "correct" implementation (since if the boids can move across the simulation boundaries, that implies a periodic simulation box), but I can't comment on how useful this actually is since the visual result doesn't show any meaningful differences between the two approaches.
+
+<details>
+  <summary>Raw Data</summary>
+
+| # Boids | Naive GPU (wrap) | Uniform Grid (wrap) | Coherent Grid (wrap) |
+|---------|------------------|----------------------|-----------------------|
+| 1000    | 153.47           | 275.796              | 271.108               |
+| 5000    | 30.4568          | 206.807              | 211.191               |
+| 10000   | 12.1871          | 157.989              | 159.727               |
+
+  
+</details>
+
+---
+
+## Q&A
+
+**Q: For each implementation, how does changing the number of boids affect performance? Why do you think this is?**
+A: On the CPU version, the performance falls off a cliff almost immediately. At around 1k boids it is already only ~40 FPS and after that it becomes unusable.
+This makes sense since the time complexity is $O(n^2)$. On the GPU the simple version holds up a bit longer but it still drops very quickly once you get into the tens of thousands of boids, because it is still quadratic.
+In comparison, the uniform and coherent grid versions scale much better. The FPS goes down roughly linearly with the number of boids and even at 50k boids the coherent grid still runs at about 100 FPS.
+At small boid counts the grid versions sit at around 290 FPS no matter what because the kernel launch and memory overheads dominate. But once the boid count goes up the advantage of the grid approach becomes very clear.
+
+**Q: For each implementation, how does changing the block count and block size affect performance? Why do you think this is?**
+A: I tested 32, 64, 128, 256 and 512 threads per block at 50k boids. The uniform grid was basically flat in performance across all of them.
+For the coherent grid the block size actually made a difference. It peaked at 128 threads per block and then dropped down at 512 threads. This is more in line with what I was expecting.
+If the block size is too small you don’t get enough work per SM, but if it is too large you lose occupancy. The uniform grid doesn’t really show this because memory access is scattered and memory bandwidth is likely the bottleneck, so changing block size doesn’t really matter.
+
+**Q: For the coherent uniform grid: did you experience any performance improvements with the more coherent uniform grid? Was this the outcome you expected? Why or why not?**
+A: Yes, the coherent version is almost always faster than the scattered version, and the difference gets larger as the boid count goes up. With 8-cell neighborhoods the coherent grid is ~16% faster at 50k boids (65.7 vs 56.3 FPS). This is what I expected since the memory access is more coalesced when boids in the same cell are stored next to each other.
+At small boid counts it doesn’t really matter because the overhead dominates, but at high boid counts it clearly makes a difference.
+
+**Q: Did changing cell width and checking 27 vs 8 neighboring cells affect performance? Why or why not?**
+A: Yes, and the effect is the opposite of what I expected. At low boid counts the 8-cell neighborhood is a bit faster, but once the boid count goes up the 27-cell version clearly pulls ahead.
+The reason I suspect is that with smaller cells you check more of them, but each one contains fewer boids, so you end up doing fewer distance checks overall. 
+
