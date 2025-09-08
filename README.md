@@ -2,7 +2,7 @@
 Project 1 - Flocking**
 
 * Haralambos Kokkinakos
-  * (TODO) [LinkedIn](https://www.linkedin.com/in/haralambos-kokkinakos-5311a3210/), [personal website](https://harriskoko.github.io/Harris-Projects/)
+  * [LinkedIn](https://www.linkedin.com/in/haralambos-kokkinakos-5311a3210/), [personal website](https://harriskoko.github.io/Harris-Projects/)
 * Tested on: (09/07/2025) Windows 24H2, i9-12900H @ 2.50GHz 16GB, RTX 3070TI Mobile
 
 ### Boid Simulation
