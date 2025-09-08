@@ -7,8 +7,8 @@ Project 1 - Flocking**
 
 ## Writeup
 
-The following answers are as requested in [[INSTRUCTION.md]].
+The following answers are as requested in [INSTRUCTION.md](/INSTRUCTION.md).
 
 ### Captures
 ![screenshot](/images/scrn.png)
-![recording](/images/rec.mp4)
+[recording](/images/rec.mp4)
