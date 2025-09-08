@@ -26,11 +26,11 @@
 // LOOK-2.1 LOOK-2.3 - toggles for UNIFORM_GRID and COHERENT_GRID
 #define VISUALIZE 0
 #define UNIFORM_GRID 0
-#define COHERENT_GRID 0
+#define COHERENT_GRID 0S
 
 // Set to 1 to write fps collection data to a log file
 // fps is collected and documented for 20 seconds and then averaged
-#define DATA_COLLECTION 1
+#define DATA_COLLECTION 0
 
 // LOOK-1.2 - change this to adjust particle count in the simulation
 const int N_FOR_VIS = 5000;
@@ -60,7 +60,7 @@ void writeDataCollectionRow(const double data[], int size) {
   for (int i = 2; i < size; i++) {
     sum += data[i];
   }
-  dataFile << ", Average FPS:" << (sum / size) << ", Data: ";
+  dataFile << ", Average FPS:" << (sum /(size - 2)) << ", Data: ";
   for (int i = 2; i < size; i++) {
     dataFile << data[i] << ", ";
   }
@@ -266,7 +266,7 @@ void initShaders(GLuint * program) {
     int frame = 0;
 
     #if DATA_COLLECTION
-    double fpsData[22]; // Take 22 data points, ignore the first two
+    double fpsData[12]; // Take 12 data points, ignore the first two
     int sampleCount = 0;
     bool wroteData = false;
     #endif
@@ -286,7 +286,7 @@ void initShaders(GLuint * program) {
         frame = 0;
         #if DATA_COLLECTION
         if (!wroteData) {
-          if (sampleCount < 22) {
+          if (sampleCount < 12) {
             fpsData[sampleCount] = fps;
             sampleCount++;
           }
