@@ -38,7 +38,7 @@ Each implementation's measurement in seconds / frame increases roughly quadratic
 
 > For each implementation, how does changing the block count and block size affect performance? Why do you think this is?
 
-Increasing the block size tended to improve performance, and the rate of improvement slowed as the block size grew.
+Increasing the block size tended to improve performance, and the rate of improvement slowed as the block size grew, even decreasing from 512 to 1024. This could be because fewer blocks would need to be scheduled, although having larger blocks could increase the chance that there are threads that return immediately and are therefore waiting while not assigned to any boids.
 
 > For the coherent uniform grid: did you experience any performance improvements with the more coherent uniform grid? Was this the outcome you expected? Why or why not?
 
@@ -46,4 +46,9 @@ The coherent uniform grid produced the highest frame rates for larger boid count
 
 > Did changing cell width and checking 27 vs 8 neighboring cells affect performance? Why or why not? Be careful: it is insufficient (and possibly incorrect) to say that 27-cell is slower simply because there are more cells to check!
 
-Decreasing the cell width and comparing 27 cells instead of determining which 8 larger cells to check resulted in a slowdown by about one third. 
+Decreasing the cell width and forcing 27 cells to be checked instead of determining which 8 larger cells to check resulted in a slowdown by about one third. This could be because having 8 times as many grid cells could drastically increase the chance of cache misses on the `gridCellStartIndices` and `gridCellEndIndices` arrays, which are also accessed at least 3.3 times as often.
+
+
+### Extra credit
+
+The set of neighbor cells to check is determined based on a bounding box surrounding each boid, allowing up to 8 or 27 cells to be checked dynamically.
