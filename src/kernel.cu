@@ -193,7 +193,7 @@ void Boids::initSimulation(int N) {
   cudaMalloc((void**)&dev_gridCellEndIndices, gridCellCount * sizeof(int));
   checkCUDAErrorWithLine("cudaMalloc dev_gridCellEndIndices failed!");
 
-  cudaMalloc((void**)&dev_pos_coherent, numObjects * sizeof(glm::vec3));
+  cudaMalloc((void**)&dev_pos_coherent, N * sizeof(glm::vec3));
   checkCUDAErrorWithLine("cudaMalloc dev_pos_coherent failed!");
 
   cudaMalloc((void**)&dev_vel_coherent, N * sizeof(glm::vec3));
@@ -558,18 +558,6 @@ __global__ void kernUpdateVelNeighborSearchScattered(
         nextVel = glm::normalize(nextVel) * maxSpeed;
     }
     vel2[index] = nextVel;
-}
-
-__global__ void kernReorderDataCoherent(int N, int* particleArrayIndices,
-    glm::vec3* posIn, glm::vec3* posOut, glm::vec3* vel1In, glm::vec3* vel1Out) {
-    int index = threadIdx.x + (blockIdx.x * blockDim.x);
-    if (index >= N) {
-        return;
-    }
-
-    int src = particleArrayIndices[index];
-    posOut[index] = posIn[src];
-    vel1Out[index] = vel1In[src];
 }
 
 // Helper function for Coherent
