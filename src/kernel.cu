@@ -67,7 +67,7 @@ void checkCUDAError(const char *msg, int line = -1)
 #define rule2Scale 0.1f
 #define rule3Scale 0.1f
 
-#define maxSpeed 0.5f
+#define maxSpeed 1.f
 
 /*! Size of the starting area in simulation space. */
 #define scene_scale 100.0f
@@ -297,34 +297,46 @@ __device__ glm::vec3 computeVelocityChange(int N, int iSelf, const glm::vec3 *po
   {
     if (iSelf != i)
     {
-      glm::vec3 currIPos = pos[i];
-      glm::vec3 currIVel = vel[i];
+      glm::vec3 currBoidPos = pos[i];
+      glm::vec3 currBoidVel = vel[i];
 
-      float dist2 = distance2(iSelfPos, currIPos);
-      // create mask values to eliminate branching
-      float mask1 = dist2 < rule1Distance * rule1Distance ? 1.f : 0.f;
-      float mask2 = dist2 < rule2Distance * rule2Distance ? 1.f : 0.f;
-      float mask3 = dist2 < rule3Distance * rule3Distance ? 1.f : 0.f;
+      float dist2 = distance2(iSelfPos, currBoidPos);
 
-      cohesion += mask1 * currIPos;
-      separation -= mask2 * (currIPos - iSelfPos);
-      alignment += mask3 * currIVel;
-
-      // update number of neighbours for rules 1 & 3
-      count1 += mask1;
-      count3 += mask3;
+      if (dist2 < rule1Distance)
+      {
+        cohesion += currBoidPos;
+        count1 += 1;
+      }
+      if (dist2 < rule2Distance)
+      {
+        separation -= currBoidPos - iSelfPos;
+      }
+      if (dist2 < rule3Distance)
+      {
+        alignment += currBoidVel;
+        count3 += 1;
+      }
     }
   }
 
-  cohesion /= glm::max(count1, 1);
-  cohesion = (cohesion - iSelfPos) * rule1Scale;
+  // post-process affectors
+  glm::vec3 rule1Vel = glm::vec3(0.f);
+  glm::vec3 rule2Vel = separation * rule2Scale;
+  glm::vec3 rule3Vel = glm::vec3(0.f);
 
-  separation *= rule2Scale;
+  if (count1 > 0)
+  {
+    cohesion /= count1;
+    rule1Vel = (cohesion - iSelfPos) * rule1Scale;
+  }
 
-  alignment /= glm::max(count3, 1);
-  alignment = alignment * rule3Scale;
+  if (count3 > 0)
+  {
+    alignment /= count3;
+    rule3Vel = alignment * rule3Scale;
+  }
 
-  return iSelfVel + cohesion + separation + alignment;
+  return iSelfVel + rule1Vel + rule2Vel + rule3Vel;
 }
 
 /**
