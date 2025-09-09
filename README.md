@@ -112,10 +112,10 @@ Conclusion: Yes there was a notable improvment, which was expected because the c
 
 ##
 
-4. Hypothesis: changing cell width and checking 27 vs 8 neighboring cells will affect performance because ... 
+4. Hypothesis: changing cell width and checking 27 vs 8 neighboring cells will affect performance because these parameters directly control the number of comparisons made per boid and the density of boids within each cell. Checking 27 neighboring cells instead of 8 will likely increase runtime due to the greater number of memory lookups and loop iterations. However, the impact may not be as dramatic if the additional cells are mostly empty.
 
-Conclusion: When cell width was too small, more cells were needed to cover the same neighborhood radius, which increased the number of neighbor cells to check. This added overhead and reduced performance.
+Conclusion: When cell width was too small, more cells were needed to cover the same neighborhood radius, which increased the number of neighbor cells to check. This added overhead and reduced performance. When cell width was too large, more boids ended up in each cell, increasing the number of pairwise checks per cell and reducing the benefits of spatial partitioning. The ideal cell width was around twice the max rule distance, as suggested (covers interaction range efficiently with minimal overlap).
 
-When cell width was too large, more boids ended up in each cell, increasing the number of pairwise checks per cell and reducing the benefits of spatial partitioning.
+Using 27-cell neighborhood search slightly increased runtime across all grid implementations due to the larger number of loop iterations and memory accesses. However, this increase was not always dramatic and depended heavily on boid density.
 
-The ideal cell width was around twice the max rule distance, as suggested (covers interaction range efficiently with minimal overlap).
+Switching to an 8-cell search did reduce runtime, especially at higher boid counts.
