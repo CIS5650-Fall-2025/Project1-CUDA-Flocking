@@ -69,4 +69,5 @@ I additionally implemented an optimized grid-looping strategy:
 |![Comparing Frame Rates of Optimized Grid-Looping with Varying Grid Widths](images/GridLoopingOptimization.png)|
 |:--:|
 |Comparing Frame Rates of Optimized Grid-Looping with Varying Grid Widths|
+
 From the graph we can see that the optimized grid looping with a grid width of 1 neighborhood distance worked the best. This is likely because as the grid width decreases, the increased number of cells we have to iterate through increases the computation enough to outweigh the reduced search area. 
