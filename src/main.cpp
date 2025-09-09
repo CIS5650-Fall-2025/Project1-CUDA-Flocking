@@ -22,15 +22,15 @@
 // ================
 
 // LOOK-2.1 LOOK-2.3 - toggles for UNIFORM_GRID and COHERENT_GRID
-#define VISUALIZE 0
+#define VISUALIZE 1
 #define UNIFORM_GRID 1
 #define COHERENT_GRID 1
 
-#define GRID_LOOP_OPTIMIZATION 1   // Enable Grid-Looping Optimization mode - extra credit
+#define GRID_LOOP_OPTIMIZATION 0  // Enable Grid-Looping Optimization mode - extra credit
 
 
 // LOOK-1.2 - change this to adjust particle count in the simulation
-const int N_FOR_VIS = 1000000; //original 5000
+const int N_FOR_VIS = 75000; //original 5000
 const float DT = 0.2f;
 
 /**
