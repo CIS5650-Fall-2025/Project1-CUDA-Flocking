@@ -20,7 +20,7 @@ This project implements a massively parallel flocking simulation based on Reynol
 - Grid-Looping Optimization (Extra Credit) with dynamic search boundaries: removes the hard‑coded “8 or 27 neighbor cells” assumption and loops only over cells that actually intersect a boid’s interaction radius.
 
 <p align="center">
-  <img src="images/Grid_Beginning_2.gif" width="220"/> <img src="images/bloid_10000.gif" width="220"/> <img src="images/Bloid_1000000.gif" width="220"/> 
+  <img src="images/Grid_Beginning_2.gif" width="220"/> <img src="images/bloid_10000.gif" width="220"/> <img src="images/Bloid_1000000.gif" width="170"/> 
   <p align="center">Visualization of 10,000 boids, 100,000 boids, and 1,000,000 boids from left to right and top to bottom</p>
 </p>
 
@@ -36,7 +36,7 @@ Compute each boid’s grid cell index and sort (key = cell, value = boid index) 
 ### Uniform grid (coherent)
 After sorting, reorder positions/velocities into sorted order so cell members are also contiguous in the position/velocity arrays. This removes the extra indirection and yields coalesced memory access during the neighbor search kernel.
 
-### Grid‑Looping Optimization (extra credit).
+### Grid‑Looping Optimization (extra credit)
 Instead of hard‑coding a list of neighbor cells (8 or 27), compute (per boid) the min/max cell indices along each axis that actually intersect the sphere of influence and loop only those cells. That is, bound your loop by (minCellX…maxCellX) × (minCellY…maxCellY) × (minCellZ…maxCellZ) for the current boid. It’s flexible and avoids unnecessary checks of far corner cells.
 
 
@@ -65,9 +65,9 @@ From the table, we can deduct that for performance, the lower number Boids is, t
 - Uniform (scattered) scales ~linearly with N (sort + limited neighbor checks). Hundreds to thousands of FPS for 10k–100k; tens for 1M.
 - Coherent is the fastest at all N because coalesced memory reduces global memory traffic in the neighbor kernel.
 
-With the rendering enabled, low counts are often vsync‑limited (~240 FPS on my setup). At higher counts, the compute becomes the bottleneck. We notice that coherent uniform remains much faster than the naive method, and significantly faster than scattered uniform at large N.
+With the rendering enabled, low counts are often vsync‑limited ~240 FPS on my setup. At higher counts, the compute becomes the bottleneck. We notice that coherent uniform remains much faster than the naive, and significantly faster than scattered uniform at large N.
 
-Coherent uniform achieves the highest simulation FPS at every size while the naive method collapses past ~50k boids. Turning viz off reveals true simulation throughput.
+Coherent uniform achieves the highest simulation FPS at every size while the naive collapses past ~50k boids. Turning viz off reveals true simulation throughput.
 
 This makes sense since neighbor candidates are pruned by spatial binning (vs. O(N²)), and coherent access makes each candidate check cheaper.
 
@@ -87,7 +87,7 @@ This can be explained by the fact that very small blocks under‑utilize warps a
 
 ### Coherent uniform grid performance
 
-Yes, coherent mode improved performance at medium and large N, which is what I expected. For example, we can see that at 10,000 boids, we have 2516.6 vs 1684.4 FPS, and at 100,000 boids we have 1594.7 vs 333.2 FPS.
+Coherent uniform grid improved performance at medium and large N, which is what I expected. For example, we can see that at 10,000 boids, we have 2516.6 vs 1684.4 FPS, and at 100,000 boids we have 1594.7 vs 333.2 FPS.
 
 By reordering positions and velocities so that boids in the same cell are contiguous, the neighbor kernel reads memory in a coalesced way. This reduces the number of global memory transactions per warp. The reorder costs extra work, so at very small N the benefit can be small or negative, but at scale the improvement dominates.
 
@@ -100,7 +100,7 @@ Performance depends on how many neighbors you actually evaluate, not just how ma
 ## Grid-Looping Optimization (Extra-credit)
 
 ### Goal
-Goal: dynamically determine (minCell…maxCell) per axis that intersect the influence radius and iterate only those cells—no hard‑coded “8 or 27” list. 
+The goal is to dynamically determine (minCell…maxCell) per axis that intersect the influence radius and iterate only those cells—no hard‑coded “8 or 27” list. 
 
 See ```Boids::stepSimulationGridLoopOptimized``` and ```__global__ void kernUpdateVelNeighborSearchCoherentOptimized``` in kernel.cu.
 
@@ -131,3 +131,11 @@ We can observe that Grid-Looping outperforms standard uniform coherent.
 At 10k–100k, Grid‑Looping does better than standard coherent grid by a healthy margin. Since fewer cells actually intersect, we have fewer candidate checks.
 
 At 500k–1M, the gains narrow. Most nearby cells contain boids, sort/reorder costs dominate, and total neighbor counts are high regardless. It still performs better than uniform coherent grid at 1M (~168 FPS vs ~88 FPS) with a smaller gap.
+
+The grid-looping optimization demonstrated that dynamic neighborhood bounds can prune unnecessary checks and outperform the standard coherent approach at moderate scales, while still remaining competitive at very large counts.
+
+## Conclusion
+
+These experiments highlight a central theme in GPU programming: algorithmic complexity alone is not enough. Data layout, memory access patterns, and occupancy tuning are just as critical for unlocking the GPU’s full potential. By carefully combining spatial partitioning with memory coherence, I achieved simulations of up to 1,000,000 boids at interactive framerates on modern hardware.
+
+This project not only deepened my understanding of CUDA and GPU architecture but also reinforced the importance of profiling, experimentation, and iterative optimization when designing high-performance systems. It was rewarding to see abstract concepts like warp divergence, coalescing, and occupancy translate directly into measurable FPS gains and scalable, visually engaging simulations.
