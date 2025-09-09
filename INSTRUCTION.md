@@ -23,6 +23,35 @@ not presently be able to do GPU performance profiling. This will be very
 important for debugging performance bottlenecks in your program. If you do not
 have administrative access to any CUDA-capable machine, please email the TA.
 
+## Part 0.1: CUDA Compute Sanitizer Quickstart
+
+Throughout your time with CUDA, you will likely run into bugs in your code due to invalid reads or write to memory. Perhaps you forgot to check the value of an index before using it or even simply `cudaMalloc`ed the wrong amount of memory. Regardless, invalid reads and writes are undefined behavior and thus can lead to [heisenbugs](https://en.wikipedia.org/wiki/Heisenbug) that are impossible to consistenly reproduce. The [CUDA Compute Sanitizer](https://developer.nvidia.com/compute-sanitizer) is a tool that can help you quickly triage these issues. It consists of four separate tools: *memcheck*, *racecheck*, *initcheck*, and *synccheck*, but the below instructions will focus on *memcheck*.
+
+**Installation:** CUDA Compute Sanitizer is included with the CUDA toolkit, so you should not need to install anything extra.
+
+**Usage:** You will need to run your compiled `.exe` from the command line with the `cuda-sanitizer` app. Use the `-h` command for more details, or just run `cuda-sanitizer` on its own to see a list of options. Example:
+
+```
+compute-sanitizer --tool memcheck mypath/to/myCUDAprogram.exe my_exe_args
+```
+
+After running, invalid reads and writes will be printed out. Using negative indices in saxpy as an example:
+
+```
+***SAXPY***
+========= Invalid __global__ read of size 4 bytes
+=========     at saxpy(float *, const float *, const float *, float, unsigned int)+0x1e0 in saxpy.cu:12
+=========     by thread (0,0,0) in block (0,0,0)
+=========     Access to 0x22623fe572c is out of bounds
+=========     and is 2,315,366,836,013 bytes after the nearest allocation at 0xb0d602000 of size 4,096 bytes
+=========     Saved host backtrace up to driver entry point at kernel launch time
+=========         Host Frame: main in saxpy.cu:87 [0x8300] in saxpy.exe
+```
+
+There is detailed information about what thread and block caused the invalid operation along with the line number in your code. Note that you must build with debug symbols (`-g` compilation flag) in order to get line numbers: otherwise you will only see the kernel name.
+
+You can read more about using CUDA Compute Sanitizer in the [official documentation](https://docs.nvidia.com/cuda/compute-sanitizer/index.html).
+
 ## Part 1: Naive Boids Simulation
 
 ### 1.0. Setup - The Usual
