@@ -27,7 +27,7 @@
 #define COHERENT_GRID 1
 
 // LOOK-1.2 - change this to adjust particle count in the simulation
-const int N_FOR_VIS = 5000;
+const int N_FOR_VIS = 50000;
 const float DT = 0.2f;
 
 /**
@@ -193,6 +193,22 @@ void initShaders(GLuint * program) {
   // Main loop
   //====================================
   void runCUDA() {
+
+      static cudaEvent_t startEvent, stopEvent;
+      static bool eventsCreated = false;
+
+      static float elapsedTimeSec = 0.0f;
+      static int frameCount = 0;
+      static float totalKernelTimeMs = 0.0f;
+
+      float dt = 0.01f;
+
+      if (!eventsCreated) {
+          cudaEventCreate(&startEvent);
+          cudaEventCreate(&stopEvent);
+          eventsCreated = true;
+      }
+
     // Map OpenGL buffer object for writing from CUDA on a single GPU
     // No data is moved (Win & Linux). When mapped to CUDA, OpenGL should not
     // use this buffer
@@ -204,6 +220,9 @@ void initShaders(GLuint * program) {
     cudaGLMapBufferObject((void**)&dptrVertPositions, boidVBO_positions);
     cudaGLMapBufferObject((void**)&dptrVertVelocities, boidVBO_velocities);
 
+    // START TIME
+    cudaEventRecord(startEvent);
+
     // execute the kernel
     #if UNIFORM_GRID && COHERENT_GRID
     Boids::stepSimulationCoherentGrid(DT);
@@ -213,12 +232,38 @@ void initShaders(GLuint * program) {
     Boids::stepSimulationNaive(DT);
     #endif
 
+    // STOP TIME
+    cudaEventRecord(stopEvent);
+    cudaEventSynchronize(stopEvent);
+
+    float kernelTimeMs = 0.0f;
+    cudaEventElapsedTime(&kernelTimeMs, startEvent, stopEvent);
+
     #if VISUALIZE
     Boids::copyBoidsToVBO(dptrVertPositions, dptrVertVelocities);
     #endif
+
     // unmap buffer object
     cudaGLUnmapBufferObject(boidVBO_positions);
     cudaGLUnmapBufferObject(boidVBO_velocities);
+
+    elapsedTimeSec += dt;
+    totalKernelTimeMs += kernelTimeMs;
+    frameCount++;
+
+    if (elapsedTimeSec >= 10.0f) {
+        float avgKernelTimeMs = totalKernelTimeMs / frameCount;
+        float avgFPS = 1000.0f / avgKernelTimeMs;
+
+        std::cout << "\n[CUDA Kernel Performance - 10s]" << std::endl;
+        std::cout << "  Average Kernel Time: " << avgKernelTimeMs << " ms" << std::endl;
+        std::cout << "  Average FPS (Simulation Only): " << avgFPS << std::endl;
+
+        // Reset for next window
+        elapsedTimeSec = 0.0f;
+        totalKernelTimeMs = 0.0f;
+        frameCount = 0;
+    }
   }
 
   void mainLoop() {
