@@ -2,18 +2,18 @@
 Project 1 - Flocking**
 
 * Jefferson Koumba Moussadji Lu
-  * [LinkedIn](https://www.linkedin.com/in/-jeff-koumba-0b356721b/), [personal website](), [twitter](), etc.
+  * [LinkedIn](https://www.linkedin.com/in/-jeff-koumba-0b356721b/)
 * Tested on: Personal Laptop, Windows 11 Home, Intel(R) Core(TM) i9-14900HX @ 2.22GHz @ 24 Cores @ 32GB RAM, Nvidia GeForce RTX 4090 @ 16 GB @  SM 8.9 
 
-![](images/Grid Beginning 2.png)
+![](images/Grid_Beginning_2.gif)
 
-![](images/bloid_10000.png)
+![](images/bloid_10000.gif)
 
-![](images/bloid_10000.png)
+![](images/Bloid_1000000.gif)
 
 ***Performance Analysis***
 
-![](images/Bloid size FPS.png)
+![](images/Bloid_size_FPS.png)
 
 ![](images/bois_FPS.png)
 

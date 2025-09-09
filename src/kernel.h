@@ -5,6 +5,8 @@ namespace Boids {
     void stepSimulationNaive(float dt);
     void stepSimulationScatteredGrid(float dt);
     void stepSimulationCoherentGrid(float dt);
+	void stepSimulationGridLoopOptimized(float dt); // Extra credit
+
     void copyBoidsToVBO(float *vbodptr_positions, float *vbodptr_velocities);
 
     void endSimulation();
