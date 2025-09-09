@@ -15,113 +15,65 @@
 
 ![Screenshot of boids](images/Screenshot%20of%20boids.png)
 
-The screenshot above is from an experiment with the following configurations:
-
-- Block size: 128
-- Number of boids: 100000
-- Mode: scattered uniform grid (with visualization)
+The screenshot above is from an experiment with 100000 boids, 1x-sized cells, scattered uniform grid, and the block size of 128.
 
 ### Recording
 
 ![Recording of boids](images/Recording%20of%20boids.gif)
 
-The screen recording above is from an experiment with the following configurations:
+The screen recording above is from an experiment with 320000 boids, 1x-sized cells, scattered uniform grid, and the block size of 128.
 
-- Block size: 128
-- Number of boids: 320000
-- Mode: scattered uniform grid (with visualization)
+## Changes to `CMakeLists.txt`
+
+- To share code among different configurations, I used lambda functions and `constexpr` in CUDA `__device__` code. To enable these features, I turned on the `--extended-lambda` and `--expt-relaxed-constexpr` flags using `target_compile_options()`.
+- To measure frame rates programmatically, all compile-time configurations are controlled by CMake definitions. These include `N_FOR_VIS`, `VISUALIZE`, `FINE_GRAINED_CELLS`, `UNIFORM_GRID`, `COHERENT_GRID`, and `CUDA_BLOCK_SIZE`.
+- The modified program has a special timed mode for measuring frame rates. To support this, CMake options are added, including `FPS_MEASURE`, `FPS_MEASURE_START`, and `FPS_MEASURE_DURATION`.
 
 ## Performance Analysis
 
-### Frame Rate vs. Number of Boids
+### Methodology
+
+All experiments in this section are launched programmatically using [`measure_fps.py`](./scripts/measure_fps.py), which re-compiles the CMake project using specific arguments, runs the program, and captures the average frame rate (in frames per second, or FPS) from stdout. The measurement of each experiment starts 2 seconds after the program's launch and lasts for 20 seconds. After that, the program exits automatically. To avoid crashing the computer, more resource-consuming configurations are skipped once the frame rate drops below 1 FPS or the program takes over 100 seconds to execute. Statistics used to create the following plots are omitted here for conciseness, and please refer to [`measurements.json`](./scripts/measurements.json) for those detailed numbers.
+
+### Number of Boids
 
 ![Frame rate vs. number of boids](images/Frame%20rate%20vs%20number%20of%20boids.png)
 
-Numbers for plotting are listed in the following table. Each number is the average over measurements of 15 seconds. All experiments used the block size of 128. Configurations that are too resource-consuming to launch with are left as N/A.
+All experiments in this set use 1x-sized cells and the block size of 128.
 
-| Number of Boids | Naive (w/o vis.) | Naive (w/ vis.) | Scattered Grid (w/o vis.) | Scattered Grid (w vis.) | Coherent Grid (w/o vis.) | Coherent Grid (w/ vis.) |
-| --------------- | ---------------- | --------------- | ------------------------- | ----------------------- | ------------------------ | ----------------------- |
-| 5000            | 1057.18          | 669.401         | 954.948                   | 637.855                 | 1136.49                  | 682.369                 |
-| 10000           | 578.73           | 430.536         | 606.269                   | 448.857                 | 852.869                  | 567.523                 |
-| 20000           | 303.208          | 246.626         | 450.065                   | 378.916                 | 761.894                  | 557.11                  |
-| 40000           | 156.814          | 133.908         | 547.381                   | 420.64                  | 1126.77                  | 715.706                 |
-| 80000           | 80.9807          | 66.5314         | 754.17                    | 500.578                 | 1533.94                  | 844.657                 |
-| 160000          | 33.699           | 21.914          | 298.219                   | 250.635                 | 1562.2                   | 856.094                 |
-| 320000          | 18.9407          | 7.64789         | 105.776                   | 96.8395                 | 1180.88                  | 666.505                 |
-| 640000          | 12.8056          | 2.02074         | 28.1882                   | 27.1921                 | 505.753                  | 364.128                 |
-| 1280000         | 10.4033          | 0.521029        | 7.32915                   | 7.16215                 | 158.943                  | 137.602                 |
-| 2560000         | N/A              | N/A             | 1.88598                   | 1.81145                 | 42.5598                  | 40.4236                 |
-| 5120000         | N/A              | N/A             | 0.463071                  | 0.409476                | 10.9749                  | 10.6321                 |
-| 10240000        | N/A              | N/A             | N/A                       | N/A                     | 2.81504                  | 2.72167                 |
-| 20480000        | N/A              | N/A             | N/A                       | N/A                     | 0.744258                 | 0.682546                |
+Discussion:
 
-Naive:
+- The naive implementation should be heavily compute-bound, and the time complexity is $O(N^2)$, where $N$ is the number of boids. Experiments confirm this trend in general, as the FPS drops consistently as $N$ increases.
+- The scattered & coherent uniform grid implementations do not show a monotonous trend at small $N$'s. The worst performance appears at $N = ~20000$. This may be caused by thread divergence in warps as not all neighbor cells are occupied by boids.
+- The two uniform-grid implementations reach their best performance at $N = ~100000$. The GPU's compute capability is probably saturated at this point.
+- When $N$ is very large, the time complexity is $O(N^2)$ for all implementations with or without uniform grids, as large $N$'s always increase the number of boids within the effective distance. This is confirmed by the linear trends in the log-log plot.
 
-- FPS falls ~inversely with $N$ because the work is $O(N^2)$. With vis it collapses earlier.  
-- Explanation: each boid compares against all others; doubling N roughly quadruples work. "(w/ vis.)" adds extra $O(N)$ draw/transfer/sync overhead, which hurts more at small–mid $N$.
+### OpenGL Visualization
 
-Uniform scattered grid: non-monotonic
+While visualizing a point cloud in OpenGL has $O(N)$ time complexity, its amount of work is much lighter than boid simulations in general. When $N$ is small, experiments with visualization turned on have slightly lower FPS. When $N$ is large, the difference becomes barely detectable.
 
-- Down at small $N$: grid build + under-utilization
-- Up at mid $N$: better SM occupancy
-- Down at large $N$: random neighbor reads saturate memory bandwidth
-
-Uniform coherent grid:
-
-- Rises at small–mid $N$, then drops at very large $N$.  
-- Explanation: algorithmic work is $~O(N)$ if cell occupancy stays bounded, and the coherent layout (sorted boids) makes neighbor reads cache- and coalescing-friendly. At very large $N$ the program hits memory bandwidth + per-frame sort overhead ($N log N$) + heavier per-cell occupancy.
-
-### Frame Rate vs. Block Size
+### Block Size
 
 ![Frame rate vs. block size](images/Frame%20rate%20vs%20block%20size.png)
 
-Numbers for plotting are listed in the following table. Each number is the average over measurements of 15 seconds. All experiments used 320000 boids and turned off visualization.
+All experiments in this set use 32000 boids, no visualization, and 1x-sized cells.
 
-| Block Size | Naive   | Scattered Grid | Coherent Grid |
-| ---------- | ------- | -------------- | ------------- |
-| 8          | 12.7485 | 158.967        | 453.725       |
-| 16         | 14.7857 | 129.124        | 743.291       |
-| 32         | 17.6827 | 105.249        | 1068.75       |
-| 64         | 18.9289 | 105.831        | 1176.1        |
-| 128        | 18.9404 | 105.803        | 1181.44       |
-| 256        | 18.9422 | 108.078        | 1200.36       |
-| 512        | 19.0132 | 108.38         | 1096.78       |
-| 1024       | 17.8544 | 108.489        | 1110.18       |
+Discussion:
 
-Recall: `blocksPerGrid = ceil(N / blockSize)`. Increasing block size ⇒ more threads per block but fewer blocks. Effects differ by memory pattern:
+- For the naive implementation, FPS improves as the block size increases from 8 to 64. This is because increased computation helps cover the latency of random global memory accesses. There is a small drop at 1024, which is probably due to reaching register limits.
+- The scattered uniform grid performs best at very small block sizes from 8 to 32, and then flattens. This is because the execution time is dominated by the latency of random global memory accesses. Increasing the block size further does not address this problem, and reduces the scheduler's ability to distribute blocks evenly among MP's.
+- The coherent uniform grid has strong gains for 8 to 16, as increased computation covers the latency of semi-sequential global memory accesses. Once the program is compute-bound, increasing the block size further does not bring consistent improvements.
 
-Naive:
+### Coherent Uniform Grids
 
-- 8→512 improves, 1024 dips slightly.
-- Explanation: larger CTAs raise occupancy and hide latency until register/shared-mem limits reduce concurrent CTAs/SM; then gains flatten or regress.
+The coherent uniform grid brings significant performance improvements, and this is the expected outcome. Sorting boid data by cells makes neighbor loops touch contiguous memory. Those data reside in $\leq 9$ pieces of contiguous memory if the cells are 1x-sized, and $\leq 4$ pieces if the cells are 2x-sized. When $N$ is large, the semi-sequential accesses are much faster than thousands of random accesses. When $N$ is small, the overhead of sorting boid data tends to dominate, resulting in the slightly lower FPS of the coherent uniform grid.
 
-Uniform scattered grid:
+### Cell Size
 
-- Best at very small blocks, then flattens.
-- Explanation: the kernel is memory-latency dominated with random accesses. Many small CTAs give the scheduler more to interleave and better hide long stalls; bigger CTAs don’t improve coalescing but reduce CTA multiplicity.
+![Frame rate vs. fine-grained cells](images/Frame%20rate%20vs%20fine-grained%20cells.png)
 
-Coherent grid:
+All experiments in this set use no visualization, coherent uniform grids, and the block size of 128.
 
-- Strong gains to 128–256, then slight drop at 512–1024.
-- Explanation: coherent layout benefits from larger CTAs (better coalescing and L2 reuse across warps) up to the point where CTA resources limit concurrency.
+When $N$ is small, 2x-sized cells should be slightly better, as the smaller number of neighbor cells means lighter looping overhead and better memory coherence. However, this advantage is not obvious is experiments, as it is hard to tell that one configuration is clearly better than the other.
 
-### Q3: Coherent Uniform Grid
-
-Yes, significantly, and this is the expected outcome.
-
-Explanation: sorting by cell makes neighbor loops touch contiguous memory. The$ O(N log N)$ sort amortizes once N is moderate because neighbor traversal dominates frame time. At very small $N$ the gap is small because overheads dominate.
-
-### Q4
-
-Don’t count cells; count neighbors actually visited and memory locality.
-
-Let dimension = d, cell width = w, density = ρ, stencil size = S (e.g., 27 vs 8).  
-Neighbor-loop work per boid ~ `S × (ρ × w^d)`.
-
-- Small cells (w ≈ interaction radius R) → larger stencil (e.g., 27 in 3D / 9 in 2D) but sparser cells.  
-- Large cells (w ≈ 2R) → smaller stencil (e.g., 8 in 3D / 4 in 2D) but each cell holds ~`2^d` more boids.
-
-3D intuition:  
-27-cell @ w=R → cost ∝ 27·ρR³.  
-8-cell @ w=2R → cost ∝ 8·ρ(2R)³ = 64·ρR³.  
-Even though 27>8, the 27-cell case can be ~2.4× cheaper because cells are 8× less populated.
+When $N$ is very large, 1x-sized cells should be much better, as more fine-grained cells allow the program to check fewer neighboring boids. If the boid density is $\rho$, and the effective distance is $R$, 1x-sized cells result in $(3 R)^3 = 27 R^3$ neighboring boids, while 2x-sized cells result in $(4 R)^3 = 64 R^3$ neighboring boids. This discrepancy is confirmed by the roughly constant offset in the log-log plot.

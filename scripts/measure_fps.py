@@ -37,11 +37,13 @@ def measure_fps_vs_num_boids() -> None:
         ("coherent uniform grid", {"UNIFORM_GRID": 1, "COHERENT_GRID": 1}),
     ]:
         print(f"Measuring FPS for method: {name}")
-        for visualize in [0, 1]:
+        # Visualize first so we can confirm correctness.
+        for visualize in [1, 0]:
             for num_boids in nums_boids:
                 config = {
                     "N_FOR_VIS": num_boids,
                     "VISUALIZE": visualize,
+                    "FINE_GRAINED_CELLS": 1,
                     **base_config,
                     "CUDA_BLOCK_SIZE": 128,
                 }
@@ -95,8 +97,54 @@ def measure_fps_vs_block_size() -> None:
             config = {
                 "N_FOR_VIS": 320000,
                 "VISUALIZE": 0,
+                "FINE_GRAINED_CELLS": 1,
                 **base_config,
                 "CUDA_BLOCK_SIZE": block_size,
+            }
+            measurement = find_measurement(config)
+            if measurement is None:
+                print(f"Measuring FPS for config: {config}")
+                start_time = time.time()
+                fps = build_and_measure_fps(**config)
+                duration = time.time() - start_time
+                measurement = {**config, "duration": duration, "fps": fps}
+                measurement_data.append(measurement)
+                with MEASUREMENTS_JSON.open("w", encoding="utf-8") as file:
+                    json.dump(measurement_data, file, indent=4)
+            else:
+                print(f"Found existing measurement for config: {config}")
+            print(f"  Duration: {measurement['duration']}")
+            print(f"  FPS: {measurement['fps']}")
+
+
+def measure_fps_vs_fine_grained_cells() -> None:
+    measurement_data: list[dict[str, Any]] = []
+    if MEASUREMENTS_JSON.exists():
+        assert MEASUREMENTS_JSON.is_file()
+        with MEASUREMENTS_JSON.open(encoding="utf-8") as file:
+            measurement_data = json.load(file)
+    else:
+        measurement_data = []
+
+    def find_measurement(config: dict[str, Any]) -> dict[str, Any] | None:
+        for measurement in measurement_data:
+            if all(
+                key in measurement and measurement[key] == value
+                for key, value in config.items()
+            ):
+                return measurement
+        return None
+
+    nums_boids = [5000 * (2**i) for i in range(13)]
+    for fine_grained in [0, 1]:
+        for num_boids in nums_boids:
+            config = {
+                "N_FOR_VIS": num_boids,
+                "VISUALIZE": 0,
+                "FINE_GRAINED_CELLS": fine_grained,
+                "UNIFORM_GRID": 1,
+                "COHERENT_GRID": 1,
+                "CUDA_BLOCK_SIZE": 128,
             }
             measurement = find_measurement(config)
             if measurement is None:
@@ -178,3 +226,4 @@ def measure_fps() -> float:
 if __name__ == "__main__":
     measure_fps_vs_num_boids()
     measure_fps_vs_block_size()
+    measure_fps_vs_fine_grained_cells()

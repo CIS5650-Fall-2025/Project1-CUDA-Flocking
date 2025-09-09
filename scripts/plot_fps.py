@@ -48,7 +48,11 @@ def plot_fps_vs_num_boids() -> None:
             {"UNIFORM_GRID": 1, "COHERENT_GRID": 1, "VISUALIZE": 1},
         ),
     ]:
-        measurements = list(find_measurements({**base_config, "CUDA_BLOCK_SIZE": 128}))
+        measurements = list(
+            find_measurements(
+                {**base_config, "FINE_GRAINED_CELLS": 1, "CUDA_BLOCK_SIZE": 128}
+            )
+        )
         measurements.sort(key=lambda m: m["N_FOR_VIS"])
         nums_boids = [m["N_FOR_VIS"] for m in measurements]
         fps = [m["fps"] for m in measurements]
@@ -76,7 +80,14 @@ def plot_fps_vs_block_size() -> None:
         ax.set_ylabel("FPS")
 
         measurements = list(
-            find_measurements({**base_config, "N_FOR_VIS": 320000, "VISUALIZE": 0})
+            find_measurements(
+                {
+                    **base_config,
+                    "N_FOR_VIS": 320000,
+                    "VISUALIZE": 0,
+                    "FINE_GRAINED_CELLS": 1,
+                }
+            )
         )
         measurements.sort(key=lambda m: m["CUDA_BLOCK_SIZE"])
         block_sizes = [m["CUDA_BLOCK_SIZE"] for m in measurements]
@@ -88,6 +99,36 @@ def plot_fps_vs_block_size() -> None:
     fig.savefig(IMAGES_DIR / "Frame rate vs block size.png")
 
 
+def plot_fps_vs_fine_grained_cells() -> None:
+    fig, ax = plt.subplots()
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel("Number of boids")
+    ax.set_ylabel("Frames per second")
+
+    for fine_grained, label in [(0, "2x-sized cells"), (1, "1x-sized cells")]:
+        measurements = list(
+            find_measurements(
+                {
+                    "VISUALIZE": 0,
+                    "FINE_GRAINED_CELLS": fine_grained,
+                    "UNIFORM_GRID": 1,
+                    "COHERENT_GRID": 1,
+                    "CUDA_BLOCK_SIZE": 128,
+                }
+            )
+        )
+        measurements.sort(key=lambda m: m["N_FOR_VIS"])
+        nums_boids = [m["N_FOR_VIS"] for m in measurements]
+        fps = [m["fps"] for m in measurements]
+        ax.plot(nums_boids, fps, marker="o", label=label)
+
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(IMAGES_DIR / "Frame rate vs fine-grained cells.png")
+
+
 if __name__ == "__main__":
     plot_fps_vs_num_boids()
     plot_fps_vs_block_size()
+    plot_fps_vs_fine_grained_cells()
