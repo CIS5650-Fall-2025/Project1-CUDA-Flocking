@@ -9,4 +9,9 @@ namespace Boids {
 
     void endSimulation();
     void unitTest();
+    int getThreadsPerBlock();
+    int   getBlockSize();
+    int   getNeighborMode();
+    float getGridCellWidth(); 
+    
 }

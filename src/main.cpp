@@ -17,6 +17,8 @@
 #include <cuda_gl_interop.h>
 #include <glm/gtc/matrix_transform.hpp>
 
+
+
 // ================
 // Configuration
 // ================
@@ -24,10 +26,24 @@
 // LOOK-2.1 LOOK-2.3 - toggles for UNIFORM_GRID and COHERENT_GRID
 #define VISUALIZE 1
 #define UNIFORM_GRID 1
-#define COHERENT_GRID 0
+#define COHERENT_GRID 1
+
+
+
+#define USE_CUDA_EVENTS 1
+
+#if UNIFORM_GRID && COHERENT_GRID
+static const char* MODE_STR = "coherent";
+#elif UNIFORM_GRID
+static const char* MODE_STR = "scattered";
+#else
+static const char* MODE_STR = "naive";
+#endif
+
+
 
 // LOOK-1.2 - change this to adjust particle count in the simulation
-const int N_FOR_VIS = 5000;
+const int N_FOR_VIS = 10000;
 const float DT = 0.2f;
 
 /**
@@ -98,6 +114,7 @@ bool init(int argc, char **argv) {
     return false;
   }
   glfwMakeContextCurrent(window);
+  glfwSwapInterval(0);
   glfwSetKeyCallback(window, keyCallback);
   glfwSetCursorPosCallback(window, mousePositionCallback);
   glfwSetMouseButtonCallback(window, mouseButtonCallback);
@@ -192,33 +209,91 @@ void initShaders(GLuint * program) {
   //====================================
   // Main loop
   //====================================
+  //void runCUDA() {
+  //  // Map OpenGL buffer object for writing from CUDA on a single GPU
+  //  // No data is moved (Win & Linux). When mapped to CUDA, OpenGL should not
+  //  // use this buffer
+
+  //  float4 *dptr = NULL;
+  //  float *dptrVertPositions = NULL;
+  //  float *dptrVertVelocities = NULL;
+
+  //  cudaGLMapBufferObject((void**)&dptrVertPositions, boidVBO_positions);
+  //  cudaGLMapBufferObject((void**)&dptrVertVelocities, boidVBO_velocities);
+
+  //  // execute the kernel
+  //  #if UNIFORM_GRID && COHERENT_GRID
+  //  Boids::stepSimulationCoherentGrid(DT);
+  //  #elif UNIFORM_GRID
+  //  Boids::stepSimulationScatteredGrid(DT);
+  //  #else
+  //  Boids::stepSimulationNaive(DT);
+  //  #endif
+
+  //  #if VISUALIZE
+  //  Boids::copyBoidsToVBO(dptrVertPositions, dptrVertVelocities);
+  //  #endif
+  //  // unmap buffer object
+  //  cudaGLUnmapBufferObject(boidVBO_positions);
+  //  cudaGLUnmapBufferObject(boidVBO_velocities);
+  //}
+
   void runCUDA() {
-    // Map OpenGL buffer object for writing from CUDA on a single GPU
-    // No data is moved (Win & Linux). When mapped to CUDA, OpenGL should not
-    // use this buffer
+     
+#if VISUALIZE
+      float* dptrVertPositions = nullptr;
+      float* dptrVertVelocities = nullptr;
+      cudaGLMapBufferObject((void**)&dptrVertPositions, boidVBO_positions);
+      cudaGLMapBufferObject((void**)&dptrVertVelocities, boidVBO_velocities);
+#endif
 
-    float4 *dptr = NULL;
-    float *dptrVertPositions = NULL;
-    float *dptrVertVelocities = NULL;
+#if USE_CUDA_EVENTS
+      static bool evInit = false;
+      static cudaEvent_t evStart, evStop;
+      static float acc_ms = 0.0f;
+      static int   acc_n = 0;
+      if (!evInit) { cudaEventCreate(&evStart); cudaEventCreate(&evStop); evInit = true; }
+      cudaEventRecord(evStart);
+#endif
 
-    cudaGLMapBufferObject((void**)&dptrVertPositions, boidVBO_positions);
-    cudaGLMapBufferObject((void**)&dptrVertVelocities, boidVBO_velocities);
+#if UNIFORM_GRID && COHERENT_GRID
+      Boids::stepSimulationCoherentGrid(DT);
+#elif UNIFORM_GRID
+      Boids::stepSimulationScatteredGrid(DT);
+#else
+      Boids::stepSimulationNaive(DT);
+#endif
 
-    // execute the kernel
-    #if UNIFORM_GRID && COHERENT_GRID
-    Boids::stepSimulationCoherentGrid(DT);
-    #elif UNIFORM_GRID
-    Boids::stepSimulationScatteredGrid(DT);
-    #else
-    Boids::stepSimulationNaive(DT);
-    #endif
+#if USE_CUDA_EVENTS
+      cudaEventRecord(evStop);
+      cudaEventSynchronize(evStop);
+      float ms = 0.f;
+      cudaEventElapsedTime(&ms, evStart, evStop);
+      acc_ms += ms;
+      acc_n += 1;
 
-    #if VISUALIZE
-    Boids::copyBoidsToVBO(dptrVertPositions, dptrVertVelocities);
-    #endif
-    // unmap buffer object
-    cudaGLUnmapBufferObject(boidVBO_positions);
-    cudaGLUnmapBufferObject(boidVBO_velocities);
+     
+      if (acc_n == 120) {
+          float avg = acc_ms / acc_n;
+          printf("mode=%s,vis=%d,N=%d,block=%d,nb=%d,cellw=%.2f,ms=%.6f,fps=%.2f\n",
+              MODE_STR, (int)VISUALIZE, N_FOR_VIS,
+              Boids::getBlockSize(),
+              Boids::getNeighborMode(),
+              Boids::getGridCellWidth(),
+              avg, 1000.0 / avg);
+          fflush(stdout);
+
+          acc_ms = 0.f;
+          acc_n = 0;
+      }
+#endif
+
+#if VISUALIZE
+    
+      Boids::copyBoidsToVBO(dptrVertPositions, dptrVertVelocities);
+      cudaGLUnmapBufferObject(boidVBO_positions);
+      cudaGLUnmapBufferObject(boidVBO_velocities);
+#endif
   }
 
   void mainLoop() {
