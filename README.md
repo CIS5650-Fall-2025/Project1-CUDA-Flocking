@@ -16,13 +16,13 @@ Project 1 - Flocking**
 ## Demo
 
 ![Naive 5k Boids](images/part1.gif)
-*Coherent implementation with 5,000 boids*
+*Naive implementation with 5,000 boids*
 
 ![Scattered 5k Boids](images/part2.gif)
 *Scattered implementation with 5,000 boids*
 
 ![Coherent 5k Boids](images/part3.gif)
-*Naive implementation with 5,000 boids*
+*Coherent implementation with 5,000 boids*
 
 ## Summary
 
