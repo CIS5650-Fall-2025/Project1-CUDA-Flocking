@@ -755,18 +755,53 @@ __global__ void kernReshuffleParticleData(int N, int* sortedParticleArrayIndices
 * Step the entire N-body simulation by `dt` seconds.
 */
 void Boids::stepSimulationNaive(float dt) {
+    // timer
+    float ms;
+    cudaEvent_t startNaive, stopNaive, startNaiveSearch, stopNaiveSearch;
+    cudaEventCreate(&startNaive);
+    cudaEventCreate(&stopNaive);
+    cudaEventCreate(&startNaiveSearch);
+    cudaEventCreate(&stopNaiveSearch);
+    cudaEventRecord(startNaive);
+
     // TODO-1.2 - use the kernels you wrote to step the simulation forward in time.
     dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
+
+    cudaEventRecord(startNaiveSearch);
+
     kernUpdateVelocityBruteForce << <fullBlocksPerGrid, blockSize>> > (numObjects, dev_pos, dev_vel1, dev_vel2);
     kernUpdatePos << <fullBlocksPerGrid, blockSize >> > (numObjects, dt, dev_pos, dev_vel2);
+
+    cudaEventRecord(stopNaiveSearch);
+    cudaEventSynchronize(stopNaiveSearch);
+    cudaEventElapsedTime(&ms, startNaiveSearch, stopNaiveSearch);
+    printf("naive search took %.3f ms\n", ms);
+    cudaEventDestroy(startNaiveSearch);
+    cudaEventDestroy(stopNaiveSearch);
     
     // TODO-1.2 ping-pong the velocity buffers
     std::swap(dev_vel1, dev_vel2);
 
     cudaDeviceSynchronize();
+
+    cudaEventRecord(stopNaive);
+    cudaEventSynchronize(stopNaive);
+    cudaEventElapsedTime(&ms, startNaive, stopNaive);
+    printf("naive simulation took %.3f ms\n", ms);
+    cudaEventDestroy(startNaive);
+    cudaEventDestroy(stopNaive);
 }
 
 void Boids::stepSimulationScatteredGrid(float dt) {
+    // timer
+    float ms;
+    cudaEvent_t startScattered, stopScattered, startScatteredSearch, stopScatteredSearch;    
+    cudaEventCreate(&startScattered);
+    cudaEventCreate(&stopScattered);
+    cudaEventCreate(&startScatteredSearch);
+    cudaEventCreate(&stopScatteredSearch);
+    cudaEventRecord(startScattered);
+
   // TODO-2.1
     // Uniform Grid Neighbor search using Thrust sort.
     // In Parallel:
@@ -793,20 +828,45 @@ void Boids::stepSimulationScatteredGrid(float dt) {
         dev_gridCellStartIndices, dev_gridCellEndIndices);
 
     // - Perform velocity updates using neighbor search
+    cudaEventRecord(startScatteredSearch);
+
     kernUpdateVelNeighborSearchScattered << <fullBlocksPerGrid, blockSize >> > (numObjects, gridSideCount,
         gridMinimum, gridInverseCellWidth, gridCellWidth, dev_gridCellStartIndices, dev_gridCellEndIndices,
         dev_particleArrayIndices, dev_pos, dev_vel1, dev_vel2);
+
+    cudaEventRecord(stopScatteredSearch);
+    cudaEventSynchronize(stopScatteredSearch);
+    cudaEventElapsedTime(&ms, startScatteredSearch, stopScatteredSearch);
+    printf("scattered search took %.3f ms\n", ms);
+    cudaEventDestroy(startScatteredSearch);
+    cudaEventDestroy(stopScatteredSearch);
 
     // - Update positions
     kernUpdatePos << <fullBlocksPerGrid, blockSize >> > (numObjects, dt, dev_pos, dev_vel2);
 
     // - Ping-pong buffers as needed
     std::swap(dev_vel1, dev_vel2);
+
+    cudaEventRecord(stopScattered);
+    cudaEventSynchronize(stopScattered);
+    cudaEventElapsedTime(&ms, startScattered, stopScattered);
+    printf("scattered simulation took %.3f ms\n", ms);
+    cudaEventDestroy(startScattered);
+    cudaEventDestroy(stopScattered);
 }
 
 
 
 void Boids::stepSimulationCoherentGrid(float dt) {
+    // timer
+    float ms;
+    cudaEvent_t startCoherent, stopCoherent, startCoherentSearch, stopCoherentSearch;
+    cudaEventCreate(&startCoherent);
+    cudaEventCreate(&stopCoherent);
+    cudaEventCreate(&startCoherentSearch);
+    cudaEventCreate(&stopCoherentSearch);
+    cudaEventRecord(startCoherent);
+
     // TODO-2.3 - start by copying Boids::stepSimulationNaiveGrid
     // Uniform Grid Neighbor search using Thrust sort on cell-coherent data.
     // In Parallel:
@@ -842,9 +902,18 @@ void Boids::stepSimulationCoherentGrid(float dt) {
         dev_pos, dev_vel1, dev_rPos, dev_rVel1);
     
     // - Perform velocity updates using neighbor search
+    cudaEventRecord(startCoherentSearch);
+
     kernUpdateVelNeighborSearchCoherent << <fullBlocksPerGrid, blockSize >> > (numObjects, gridSideCount,
         gridMinimum, gridInverseCellWidth, gridCellWidth, dev_gridCellStartIndices, dev_gridCellEndIndices,
         dev_rPos, dev_rVel1, dev_rVel2);
+
+    cudaEventRecord(stopCoherentSearch);
+    cudaEventSynchronize(stopCoherentSearch);
+    cudaEventElapsedTime(&ms, startCoherentSearch, stopCoherentSearch);
+    printf("coherent search took %.3f ms\n", ms);
+    cudaEventDestroy(startCoherentSearch);
+    cudaEventDestroy(stopCoherentSearch);
     
     // - Update positions
     kernUpdatePos << <fullBlocksPerGrid, blockSize >> > (numObjects, dt, dev_rPos, dev_rVel2);
@@ -856,6 +925,13 @@ void Boids::stepSimulationCoherentGrid(float dt) {
     std::swap(dev_pos, dev_rPos);
     std::swap(dev_vel1, dev_rVel1);
     std::swap(dev_vel2, dev_rVel2);
+
+    cudaEventRecord(stopCoherent);
+    cudaEventSynchronize(stopCoherent);
+    cudaEventElapsedTime(&ms, startCoherent, stopCoherent);
+    printf("coherent simulation took %.3f ms\n", ms);
+    cudaEventDestroy(startCoherent);
+    cudaEventDestroy(stopCoherent);
 }
 
 void Boids::endSimulation() {
