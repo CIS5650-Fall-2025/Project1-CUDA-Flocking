@@ -1,7 +1,9 @@
-﻿**University of Pennsylvania, CIS 5650: GPU Programming and Architecture,
+﻿**Note:** Using 1 late day + extension granted by Mr. Mohammed
+
+**University of Pennsylvania, CIS 5650: GPU Programming and Architecture,
 Project 1 - Flocking**
 
-USING 1 LATE DAY AND AN EXTRA EXTENSION DAY GIVEN BY MR. MOHAMMED 
+
 
 * **Cindy Wei**
 * **Tested on:**  
@@ -72,12 +74,6 @@ Each timestep, every boid checks all others and applies:
 
 **Grid configuration:** `cellw = neighbor radius` → 27 cells in 3D (`nb=27`)
 
-### Performance Measurement
-- Timed with `cudaEventElapsedTime` over multiple frames
-- Release build, VSync disabled
-- Warmup frames before timing
-- Log files: `logs/fps_vs_N_*_vis{0,1}_N{N}.txt`
-
 ## Performance Results
 
 ### Framerate vs Number of Boids
@@ -94,9 +90,9 @@ Each timestep, every boid checks all others and applies:
 
 | N (boids) | vis | Scattered FPS | Coherent FPS | Improvement |
 |-----------|-----|---------------|--------------|-------------|
-| 2,000     | 0   | 8.3-8.8k      | 9.3-10.0k    | +8-15%      |
-| 5,000     | 0   | 4.9-5.1k      | 5.0-5.3k     | +2-8%       |
-| 10,000    | 0   | 4.2-4.5k      | 4.7-5.0k     | +8-15%      |
+| 2,000     | 0   | 8,500         | 9,650        | +13.5%      |
+| 5,000     | 0   | 5,000         | 5,400        | +8.0%       |
+| 10,000    | 0   | 4,350         | 4,850        | +11.5%      |
 
 ## Performance Analysis
 
