@@ -15,13 +15,13 @@ Project 1 - Flocking**
 
 ## Demo
 
-![Coherent 5k Boids](images/part1.gif)
+![Naive 5k Boids](images/part1.gif)
 *Coherent implementation with 5,000 boids*
 
 ![Scattered 5k Boids](images/part2.gif)
 *Scattered implementation with 5,000 boids*
 
-![Naive 5k Boids](images/part3.gif)
+![Coherent 5k Boids](images/part3.gif)
 *Naive implementation with 5,000 boids*
 
 ## Summary
@@ -77,11 +77,11 @@ Each timestep, every boid checks all others and applies:
 ## Performance Results
 
 ### Framerate vs Number of Boids
-![FPS vs N](images/framerate_vs_num_boids_.png)
+![FPS vs N](images/framerate_vs_num_boids.png)
 
 
 ### Block Size Optimization
-![Optimal performance at 128-512 threads/block](images/block_size_.png)
+![Optimal performance at 128-512 threads/block](images/block_size.png)
 *Performance improvement with coherent memory access*
 
 
