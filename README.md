@@ -1,3 +1,4 @@
+# Project 1 - CUDA Boids
 **University of Pennsylvania, CIS 5650: GPU Programming and Architecture,
 Project 1 - Flocking**
 
