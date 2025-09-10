@@ -26,9 +26,14 @@ const float fovy = (float) (PI / 4);
 const float zNear = 0.10f;
 const float zFar = 10.0f;
 // LOOK-1.2: for high DPI displays, you may want to double these settings.
-int width = 1280;
-int height = 720;
-int pointSize = 2;
+// int width = 1280;
+// int height = 720;
+// int pointSize = 2;
+
+// high DPI config
+int width = 2560;
+int height = 1920;
+int pointSize = 6;
 
 // For camera controls
 bool leftMousePressed = false;
@@ -38,7 +43,8 @@ double lastY;
 float theta = 1.22f;
 float phi = -0.70f;
 float zoom = 4.0f;
-glm::vec3 lookAt = glm::vec3(0.0f, 0.0f, 0.0f);
+// glm::vec3 lookAt = glm::vec3(0.0f, 0.0f, 0.0f);
+glm::vec3 lookAt = glm::vec3(0.0f, 0.0f, -0.25f);
 glm::vec3 cameraPosition;
 
 glm::mat4 projection;
