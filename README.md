@@ -45,7 +45,7 @@ This implementation is similar to the uniform grid search, but instead of using 
 
 ## Performance Analysis
 
-# Average Simulation Time Without Visualization
+### Average Simulation Time Without Visualization
 
 | Number of Boids | Naive | Uniform Grid | Coherent |
 | --------- | --------- | --------- | --------- |
@@ -57,7 +57,7 @@ This implementation is similar to the uniform grid search, but instead of using 
 
 <img src="images/Average Simulation Time vs. Number of Boids.png" width="50%">
 
-# Average Search Time Without Visualization
+### Average Search Time Without Visualization
 
 | Number of Boids | Naive | Uniform Grid | Coherent |
 | --------- | --------- | --------- | --------- |
