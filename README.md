@@ -37,6 +37,6 @@ The coherent grid improves on the uniform grid approach by taking advantage of s
 
 ## Performance Analysis
 All performance tests were conducted on Windows 11, Intel(R) i7-14700HX CPU (2.1 GHz), NVIDIA RTX 5060 Laptop GPU. The primary metric used to evaluate performance is Frames Per Second (FPS). Higher FPS values indicate better performance and smoother real-time simulation.
-
+![CUDA Flocking](images/Performance.png)
 
 
