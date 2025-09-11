@@ -66,4 +66,5 @@ I found that checking 8 neighboring cells results in about a 2× increase in FPS
 
 
 ![CUDA Flocking](images/Million-CUDA-Flocking.gif)
+
 *1,000,000 boids with Coherent Grid Search*
