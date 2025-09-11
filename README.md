@@ -64,7 +64,7 @@ For the coherent uniform grid, clear performance improvements are found in the g
 
 I found that checking 8 neighboring cells results in about a 2× increase in FPS compared to checking 27 cells, for both the uniform and coherent grid implementations. The naive implementation’s performance remains unchanged. This improvement is contributed by checking fewer neighboring cells reducing the number of boids each thread must evaluate. In addition checking a smaller area means that neighbor boids that will not affect the overall are skipped wasting less performance. 
 
-##For the Curious: 1,000,000 Boids
+## For the Curious: 1,000,000 Boids
 
 ![CUDA Flocking](images/Million-CUDA-Flocking.gif)
 
