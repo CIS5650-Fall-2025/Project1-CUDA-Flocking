@@ -1,5 +1,5 @@
-#University of Pennsylvania, CIS 5650: GPU Programming and Architecture
-##Project 1 - Flocking
+# University of Pennsylvania, CIS 5650: GPU Programming and Architecture
+## Project 1 - Flocking
 
 * Zwe Tun
   * LinkedIn: https://www.linkedin.com/in/zwe-tun-6b7191256/
@@ -7,7 +7,7 @@
 ![CUDA Flocking](images/CUDA-Flocking.gif)
 
 *100,000 boids with Coherent Grid Search* 
-### Overview 
+## Overview 
 Boids are artificial agents that simulate the behavior of flocking animals. Introduced by Craig Reynolds in 1986, each boid follows three simple rules:
 Cohesion - boids move towards the perceived center of mass of their neighbors
 Separation - boids avoid getting to close to their neighbors
