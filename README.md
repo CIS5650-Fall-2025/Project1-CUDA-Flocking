@@ -6,7 +6,7 @@ Project 1 - Flocking**
 * Tested on: Intel(R) i7-14700HX, 2100 Mhz, RTX 5060 Laptop
 ![CUDA Flocking](images/CUDA-Flocking.gif)
 
-100,000 boids with Coherant Grid search 
+100,000 boids with Coherent Grid search 
 ### Overview 
 Boids are artificial agents that simulate the behavior of flocking animals. Introduced by Craig Reynolds in 1986, each boid follows three simple rules:
 Cohesion - boids move towards the perceived center of mass of their neighbors
@@ -29,15 +29,28 @@ In the scattered version, boid data (position, velocity) is stored in separate b
 
 10,000 boids with Uniform Grid Search  
 
-## Coherant Grid Search 
+## Coherent Grid Search 
 The coherent grid improves on the uniform grid approach by taking advantage of spatial locality to optimize memory access on the GPU. In the scattered grid version, boid data is stored in separate buffers and accessed via indirect lookups, causing threads to read from scattered memory locations. This leads to reduced cache utilization. The coherent grid reorganizes the boid data so that boids located in the same or neighboring grid cells are stored contiguously in memory. By reshuffling the boid data arrays to align with their cell indices, the GPU can access data in adjacent memory locations, further improving performance. 
 ![CUDA Flocking](images/Coherant-CUDA-Flocking.gif)
 
-10,000 boids with Coherant Grid Search  
+10,000 boids with Coherent Grid Search  
 
 ## Performance Analysis
 All performance tests were conducted on Windows 11, Intel(R) i7-14700HX CPU (2.1 GHz), NVIDIA RTX 5060 Laptop GPU. The primary metric used to evaluate performance is Frames Per Second (FPS). Higher FPS values indicate better performance and smoother real-time simulation.
 ![CUDA Flocking](images/Off.png)
 
-![CUDA Flocking](images/On.png)
+![CUDA Flocking](images/On.png)500
+
+We can notice the perforamance differences in the graphs shown above. With the coherent grid search almost 2.5x the FPS of the naive implmentation for 5000 boids. This differences is even more noticible with higher boid counts as the 100,000 coherent is about 55x the FPS of naive. 
+
+## Questions 
+#For each implementation, how does changing the number of boids affect performance? Why do you think this is?
+As the number of boids increases, all 3 methods see a decrease in performance (FPS) due to more computational load. This is shown in the plots where all 3 methods see a decrease in FPS as boid counts increases. 
+
+#For each implementation, how does changing the block count and block size affect performance? Why do you think this is?
+
+#For the coherent uniform grid: did you experience any performance improvements with the more coherent uniform grid? Was this the outcome you expected? Why or why not?
+For the coherent uniform grid, clear performance improvements are found in the graphs above. With 5,000 boids, the coherent grid achieves nearly 2.5× the FPS of the naive implementation. This performance gap is more noticible at higher boid counts—for example, at 100,000 boids, the coherent grid runs at about 55× the FPS of the naive method. This superior performance is expected, as the coherent grid uses spatial locality to get more efficient memory access and reduce unnecessary computations.
+
+#Did changing cell width and checking 27 vs 8 neighboring cells affect performance? Why or why not? Be careful: it is insufficient (and possibly incorrect) to say that 27-cell is slower simply because there are more cells to check!
 
