@@ -11,7 +11,7 @@
 Boids are artificial agents that simulate the behavior of flocking animals. Introduced by Craig Reynolds in 1986, each boid follows three simple rules:
 Cohesion - boids move towards the perceived center of mass of their neighbors
 Separation - boids avoid getting to close to their neighbors
-Alignment - boids generally try to move with the same direction and speed as their neighbors
+Alignment - boids generally try to move with the same direction and speed as their neighbors.
 
 ## Implementation 
 
