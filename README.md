@@ -39,3 +39,4 @@ The coherent grid improves on the uniform grid approach by taking advantage of s
 The following perfomance analysis will be run on Windows 11, Intel(R) i7-14700HX, 2100 Mhz, RTX 5060 Laptop. Frames Per Second (FPS) will be the metric to determine performance of alogorthms discusssed above. Higher FPS can be thought of us better performance. 
 
 
+
