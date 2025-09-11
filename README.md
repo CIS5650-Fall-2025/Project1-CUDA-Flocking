@@ -100,7 +100,7 @@ This implementation is similar to the uniform grid search, but instead of using 
 
 ### Increasing Block Size
 
-#### Average Simulation Time Without Visualization
+#### Average Simulation Time Without Visualization for 5000 Boids
 
 | Number of Boids | Naive | Uniform Grid | Coherent |
 | --------- | --------- | --------- | --------- |
@@ -110,10 +110,10 @@ This implementation is similar to the uniform grid search, but instead of using 
 | 512 | 2.676 | 0.595 | 0.518 |
 | 1024 | 3.649 | 0.747 | 0.709 |
 
-<img src="images/Average Simulation Time vs. Block Size (Visualization Disbled).png" width="80%">
+<img src="images/Average Simulation Time vs. Block Size (Visualization Disbled, 5000 Boids).png" width="80%">
 
 
-#### Average Search Time Without Visualization
+#### Average Search Time Without Visualization for 5000 Boids
 
 | Number of Boids | Naive | Uniform Grid | Coherent |
 | --------- | --------- | --------- | --------- |
@@ -123,4 +123,4 @@ This implementation is similar to the uniform grid search, but instead of using 
 | 512 | 2.519 | 0.249 | 0.138 |
 | 1024 | 3.525 | 0.42 | 0.170 |
 
-<img src="images/Average Search Time vs. Block Size (Visualization Disbled).png" width="80%">
+<img src="images/Average Search Time vs. Block Size (Visualization Disbled, 5000 Boids).png" width="80%">
