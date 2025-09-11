@@ -10,7 +10,7 @@ Project 1 - Flocking**
 
 * Tested on: (TODO) Windows 11, 12th Gen Intel(R) Core(TM) i7-12700H @ 2.30GHz, NVIDIA GeForce RTX 3080 Laptop GPU (16 GB)
 
-* Features
+* Features:
   * Naive neighbor search
   * Uniform grid neighbor search
   * Coherent grid neighbor search with memory reordering
