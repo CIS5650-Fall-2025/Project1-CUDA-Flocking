@@ -36,7 +36,9 @@ The coherent grid improves on the uniform grid approach by taking advantage of s
 *10,000 boids with Coherent Grid Search*  
 
 ## Performance Analysis
+
 All performance tests were conducted on Windows 11, Intel(R) i7-14700HX CPU (2.1 GHz), NVIDIA RTX 5060 Laptop GPU. The primary metric used to evaluate performance is Frames Per Second (FPS). Higher FPS values indicate better performance and smoother real-time simulation.
+
 ![CUDA Flocking](images/Off.png)
 
 ![CUDA Flocking](images/On.png)
@@ -62,3 +64,6 @@ For the coherent uniform grid, clear performance improvements are found in the g
 
 I found that checking 8 neighboring cells results in about a 2× increase in FPS compared to checking 27 cells, for both the uniform and coherent grid implementations. The naive implementation’s performance remains unchanged. This improvement is contributed by checking fewer neighboring cells reducing the number of boids each thread must evaluate. In addition checking a smaller area means that neighbor boids that will not affect the overall are skipped wasting less performance. 
 
+
+![CUDA Flocking](images/Million-CUDA-Flock.gif)
+*1,000,000 boids with Coherent Grid Search*
