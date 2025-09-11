@@ -45,7 +45,9 @@ This implementation is similar to the uniform grid search, but instead of using 
 
 ## Performance Analysis
 
-### Average Simulation Time Without Visualization
+### Increasing Number of Boids
+
+#### Average Simulation Time Without Visualization
 
 | Number of Boids | Naive | Uniform Grid | Coherent |
 | --------- | --------- | --------- | --------- |
@@ -57,7 +59,8 @@ This implementation is similar to the uniform grid search, but instead of using 
 
 <img src="images/Average Simulation Time vs. Number of Boids (Visualization Disabled).png" width="80%">
 
-### Average Simulation Time With Visualization
+
+#### Average Simulation Time With Visualization
 
 | Number of Boids | Naive | Uniform Grid | Coherent |
 | --------- | --------- | --------- | --------- |
@@ -69,7 +72,8 @@ This implementation is similar to the uniform grid search, but instead of using 
 
 <img src="images/Average Simulation Time vs. Number of Boids (Visualization Enabled).png" width="80%">
 
-### Average Search Time Without Visualization
+
+#### Average Search Time Without Visualization
 
 | Number of Boids | Naive | Uniform Grid | Coherent |
 | --------- | --------- | --------- | --------- |
@@ -81,7 +85,8 @@ This implementation is similar to the uniform grid search, but instead of using 
 
 <img src="images/Average Search Time vs. Number of Boids (Visualization Disabled).png" width="80%">
 
-### Average Search Time With Visualization
+
+#### Average Search Time With Visualization
 
 | Number of Boids | Naive | Uniform Grid | Coherent |
 | --------- | --------- | --------- | --------- |
@@ -93,3 +98,29 @@ This implementation is similar to the uniform grid search, but instead of using 
 
 <img src="images/Average Search Time vs. Number of Boids (Visualization Enabled).png" width="80%">
 
+### Increasing Block Size
+
+#### Average Simulation Time Without Visualization
+
+| Number of Boids | Naive | Uniform Grid | Coherent |
+| --------- | --------- | --------- | --------- |
+| 64 | 2.435 | 0.660 | 0.42 |
+| 128 | 2.460 | 0.641 | 0.546 |
+| 256 | 2.6939 | 1.155 | 0.463 |
+| 512 | 2.676 | 0.595 | 0.518 |
+| 1024 | 3.649 | 0.747 | 0.709 |
+
+<img src="images/Average Simulation Time vs. Block Size (Visualization Disbled).png" width="80%">
+
+
+#### Average Search Time Without Visualization
+
+| Number of Boids | Naive | Uniform Grid | Coherent |
+| --------- | --------- | --------- | --------- |
+| 64 | 2.294 | 0.292 | 0.116 |
+| 128 | 2.301 | 0.273 | 0.114 |
+| 256 | 2.337 | 0.264 | 0.113 |
+| 512 | 2.519 | 0.249 | 0.138 |
+| 1024 | 3.525 | 0.42 | 0.170 |
+
+<img src="images/Average Search Time vs. Block Size (Visualization Disbled).png" width="80%">
