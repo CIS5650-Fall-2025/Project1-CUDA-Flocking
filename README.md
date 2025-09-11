@@ -46,19 +46,19 @@ All performance tests were conducted on Windows 11, Intel(R) i7-14700HX CPU (2.1
 ![CUDA Flocking](images/CellSearched.png)
 
 ## Questions 
-###For each implementation, how does changing the number of boids affect performance? Why do you think this is?
+### For each implementation, how does changing the number of boids affect performance? Why do you think this is?
 
 As the number of boids increases, all 3 methods see a decrease in performance (FPS) due to more computational load. This is shown in the plots where all 3 methods see a decrease in FPS as boid counts increases. 
 
-###For each implementation, how does changing the block count and block size affect performance? Why do you think this is?
+### For each implementation, how does changing the block count and block size affect performance? Why do you think this is?
 
 Yes, increasing or decreasing the block size tends to slightly lower performance across the board. This happens because the GPU scheduler tries to optimize its task based on the given resources, and if the sizes or counts or not well balanced it can lead to poor optimization. 
 
-###For the coherent uniform grid: did you experience any performance improvements with the more coherent uniform grid? Was this the outcome you expected? Why or why not?
+### For the coherent uniform grid: did you experience any performance improvements with the more coherent uniform grid? Was this the outcome you expected? Why or why not?
 
 For the coherent uniform grid, clear performance improvements are found in the graphs above. With 5,000 boids, the coherent grid achieves nearly 2.5× the FPS of the naive implementation. This performance gap is more noticible at higher boid counts—for example, at 100,000 boids, the coherent grid runs at about 55× the FPS of the naive method. This superior performance is expected, as the coherent grid uses spatial locality to get more efficient memory access and reduce unnecessary computations.
 
-###Did changing cell width and checking 27 vs 8 neighboring cells affect performance? Why or why not?
+### Did changing cell width and checking 27 vs 8 neighboring cells affect performance? Why or why not?
 
 I found that checking 8 neighboring cells results in about a 2× increase in FPS compared to checking 27 cells, for both the uniform and coherent grid implementations. The naive implementation’s performance remains unchanged. This improvement is contributed by checking fewer neighboring cells reducing the number of boids each thread must evaluate. In addition checking a smaller area means that neighbor boids that will not affect the overall are skipped wasting less performance. 
 
