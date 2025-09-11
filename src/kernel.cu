@@ -49,7 +49,7 @@ void checkCUDAError(const char *msg, int line = -1) {
 *****************/
 
 /*! Block size used for CUDA kernel launch. */
-#define blockSize 32
+#define blockSize 128
 
 // LOOK-1.2 Parameters for the boids algorithm.
 // These worked well in our reference implementation.
@@ -471,12 +471,12 @@ __global__ void kernUpdateVelNeighborSearchScattered(
     int rule3neighbors = 0;
 
 
-	//27 possible cells to check
-	//loop over z, y, x
+	//8 possible cells to check
+	//loop over z, y
     for (int z = -1; z <= 1; z++) {
         for (int y = -1; y <= 1; y++) {
-            for (int x = -1; x <= 1; x++) {
-                int neighborX = iX + x;
+            
+                int neighborX = iX;
                 int neighborY = iY + y;
                 int neighborZ = iZ + z;
                 if (neighborX < 0 || neighborY < 0 || neighborZ < 0 || neighborX >= gridResolution || neighborY >= gridResolution || neighborZ >= gridResolution) {
@@ -520,7 +520,7 @@ __global__ void kernUpdateVelNeighborSearchScattered(
 
                 }
 
-            }
+            
         }
 	}
 
@@ -596,8 +596,8 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
 
     for (int z = -1; z <= 1; z++) {
         for (int y = -1; y <= 1; y++) {
-            for (int x = -1; x <= 1; x++) {
-                int neighborX = iX + x;
+           
+                int neighborX = iX;
                 int neighborY = iY + y;
                 int neighborZ = iZ + z;
                 if (neighborX < 0 || neighborY < 0 || neighborZ < 0 || neighborX >= gridResolution || neighborY >= gridResolution || neighborZ >= gridResolution) {
@@ -644,7 +644,7 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
                 }
 
 
-            }
+            
         }
     }
 
