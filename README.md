@@ -5,7 +5,7 @@ Project 1 - Flocking**
   * [https://www.linkedin.com/in/avi-serebrenik-a7386426b/](), [https://aviserebrenik.wixsite.com/cvsite]()
 * Tested on: Windows 11, i7-13620H @ 2.4GHz 32GB, RTX 4070 8GB (Laptop)
 
-### Overview
+# Overview
  ![](gif.gif)
  This gif was recorded on the machine described above with 50000 boids and a timestep of 0.02 to make the animation smooth.
  The boids follow a generic flocking algorithm based on Conrad Parker's notes: [https://vergenet.net/~conrad/boids/pseudocode.html]()
@@ -37,7 +37,7 @@ Project 1 - Flocking**
     and another one to unsort before the next loop, as positions would get confused otherwise in the current setup. The performance
     of this method versus the one above is discussed below in the results section, but it is the most performant.
 
-### Results
+# Results
  I have plotted the runtime of these algorithms (in ms) with varying boid counts at 0.2s dt to see the difference these optimizations make,
  however I would focus on the comparisons between the algorithms and not the specific values, as I had other applications open, and my method
  for getting the milliseconds was counting to 5 in my head and then capturing an Nsight GPU Trace.
@@ -77,7 +77,7 @@ Project 1 - Flocking**
   ![](plotBlocks.png)
   ![](profiler.png)
  
-### Question Answers
+# Question Answers
 These are the questions and answers as part of this homework.
  - For each implementation, how does changing the number of boids affect performance? Why do you think this is?
      I discussed this above, but the number of boids decreases performance as there are simply more calculations to do. Interestingly, there is an
