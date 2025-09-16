@@ -6,6 +6,8 @@ Project 1 - Flocking - LATE DAY USED**
   * https://www.linkedin.com/in/henry-han-a832a6284/
 * Tested on: Windows 11 Pro 24H2, i7-9750H @ 2.60GHz 16GB, RTX 2070 Max-Q
 
+**I modified CMakeLists.txt**
+
 ## Screenshots
 
 ![](/profiles/11.gif)
